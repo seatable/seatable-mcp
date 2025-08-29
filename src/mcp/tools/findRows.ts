@@ -38,13 +38,28 @@ export const Where: z.ZodTypeAny = z.lazy(() =>
 )
 export type Where = z.infer<typeof Where>
 
-const InputShape = {
+// Strict internal input (uses full DSL)
+const InternalInput = z.object({
   table: z.string(),
   where: Where,
   page: z.number().int().min(1).optional().default(1),
   page_size: z.number().int().min(1).max(1000).optional().default(100),
   order_by: z.string().optional(),
   direction: z.enum(['asc', 'desc']).optional().default('asc'),
+})
+
+// Public input schema exposed to clients (explicit JSON schema to avoid recursive/array conversion issues)
+const PublicInputJsonSchema = {
+  type: 'object',
+  properties: {
+    table: { type: 'string' },
+    where: { type: 'object', additionalProperties: true },
+    page: { type: 'integer', minimum: 1 },
+    page_size: { type: 'integer', minimum: 1, maximum: 1000 },
+    order_by: { type: 'string' },
+    direction: { type: 'string', enum: ['asc', 'desc'] },
+  },
+  required: ['table', 'where'],
 } as const
 
 function toStringSafe(v: unknown): string {
@@ -135,11 +150,10 @@ export const registerFindRows: ToolRegistrar = (server, { client }) => {
       title: 'Find Rows',
       description:
         'Find rows using a predicate DSL. Filtering is performed client-side for broad compatibility. Supports and/or/not, eq, ne, in, gt/gte/lt/lte, contains, starts_with, ends_with, is_null.',
-      // Use Zod shape like other tools to keep SDK validation path consistent
-      inputSchema: InputShape,
+      inputSchema: PublicInputJsonSchema,
     },
     async (args: unknown) => {
-      const parsed = z.object(InputShape).parse(args)
+      const parsed = InternalInput.parse(args)
       const pageSizeFetch = 1000
       const maxPages = 50 // safety cap (50k rows scanned)
       let page = 1

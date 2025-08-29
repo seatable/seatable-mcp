@@ -21,7 +21,16 @@ export const registerUpsertRows: ToolRegistrar = (server, { client }) => {
             title: 'Upsert Rows',
             description:
                 'Batch upsert rows by matching on one or more key columns. If a match exists, update it; otherwise insert a new row. Rejects unknown columns unless allow_create_columns=true.',
-            inputSchema: InputShape,
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    table: { type: 'string' },
+                    key_columns: { type: 'array', items: { type: 'string' }, minItems: 1 },
+                    rows: { type: 'array', items: { type: 'object' } },
+                    allow_create_columns: { type: 'boolean' },
+                },
+                required: ['table', 'key_columns', 'rows'],
+            },
         },
         async (args: unknown) => {
             const { table, key_columns, rows, allow_create_columns } = Input.parse(args)

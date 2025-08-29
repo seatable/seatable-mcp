@@ -22,15 +22,25 @@ export const registerManageColumns: ToolRegistrar = (server, { client }) => {
       title: 'Manage Columns',
       description: 'Create, update, and delete columns with normalized schema outputs.',
       inputSchema: {
-        table: z.string(),
-        operations: z.array(
-          z.object({
-            action: z.enum(['create', 'update', 'delete']),
-            create: z.any().optional(),
-            update: z.any().optional(),
-            delete: z.any().optional(),
-          })
-        ).min(1),
+        type: 'object',
+        properties: {
+          table: { type: 'string' },
+          operations: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                action: { type: 'string', enum: ['create', 'update', 'delete'] },
+                create: { type: 'object' },
+                update: { type: 'object' },
+                delete: { type: 'object' },
+              },
+              required: ['action'],
+            },
+            minItems: 1,
+          },
+        },
+        required: ['table', 'operations'],
       },
     },
     async (args: unknown) => {

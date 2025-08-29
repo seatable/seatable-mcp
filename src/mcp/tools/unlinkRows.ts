@@ -15,9 +15,21 @@ export const registerUnlinkRows: ToolRegistrar = (server, { client }) => {
       title: 'Unlink Rows',
       description: 'Remove links between rows by updating the link column with row IDs.',
       inputSchema: {
-        table: z.string(),
-        link_column: z.string(),
-        pairs: z.array(z.object({ from_row_id: z.string(), to_row_id: z.string() })).min(1),
+        type: 'object',
+        properties: {
+          table: { type: 'string' },
+          link_column: { type: 'string' },
+          pairs: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: { from_row_id: { type: 'string' }, to_row_id: { type: 'string' } },
+              required: ['from_row_id', 'to_row_id'],
+            },
+            minItems: 1,
+          },
+        },
+        required: ['table', 'link_column', 'pairs'],
       },
     },
     async (args: unknown) => {

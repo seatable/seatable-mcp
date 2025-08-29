@@ -7,20 +7,29 @@ const InputShape = {
     row_ids: z.array(z.string()),
 } as const
 
+const Input = z.object(InputShape)
+
 export const registerDeleteRows: ToolRegistrar = (server, { client }) => {
     server.registerTool(
         'delete_rows',
         {
             title: 'Delete Rows',
-            description: 'Delete rows by ID from a table',
-            inputSchema: InputShape,
+            description: 'Delete one or more rows from a table by their IDs.',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    table: { type: 'string' },
+                    row_ids: { type: 'array', items: { type: 'string' } },
+                },
+                required: ['table', 'row_ids'],
+            },
         },
         async (args: unknown) => {
-            const { table, row_ids } = z.object(InputShape).parse(args)
-            const results = [] as any[]
-            for (const id of row_ids) {
-                const res = await client.deleteRow(table, id)
-                results.push({ row_id: id, ...res })
+            const { table, row_ids } = Input.parse(args)
+            const results = []
+            for (const row_id of row_ids) {
+                const res = await client.deleteRow(table, row_id)
+                results.push({ row_id, success: res.success })
             }
             return { content: [{ type: 'text', text: JSON.stringify({ results }) }] }
         }

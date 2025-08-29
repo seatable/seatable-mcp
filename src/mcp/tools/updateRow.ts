@@ -30,7 +30,25 @@ export const registerUpdateRows: ToolRegistrar = (server, { client }) => {
         {
             title: 'Update Rows',
             description: 'Batch update rows. Rejects unknown columns unless allow_create_columns=true',
-            inputSchema: InputShape,
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    table: { type: 'string' },
+                    updates: {
+                        type: 'array',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                row_id: { type: 'string' },
+                                values: { type: 'object' },
+                            },
+                            required: ['row_id', 'values'],
+                        },
+                    },
+                    allow_create_columns: { type: 'boolean' },
+                },
+                required: ['table', 'updates'],
+            },
         },
         async (args: unknown) => {
             const { table, updates, allow_create_columns } = Input.parse(args)

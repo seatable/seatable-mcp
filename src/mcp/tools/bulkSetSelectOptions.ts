@@ -14,13 +14,30 @@ export const registerBulkSetSelectOptions: ToolRegistrar = (server, { client }) 
       title: 'Bulk Set Select Options',
       description: 'Bulk update select options for one or more select columns on a table. Only single_select and multi_select columns are supported.',
       inputSchema: {
-        table: z.string(),
-        updates: z.array(
-          z.object({
-            column: z.string(),
-            options: z.array(z.object({ name: z.string(), color: z.string().optional() })).min(0),
-          })
-        ).min(1),
+        type: 'object',
+        properties: {
+          table: { type: 'string' },
+          updates: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                column: { type: 'string' },
+                options: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: { name: { type: 'string' }, color: { type: 'string' } },
+                    required: ['name'],
+                  },
+                },
+              },
+              required: ['column', 'options'],
+            },
+            minItems: 1,
+          },
+        },
+        required: ['table', 'updates'],
       },
     },
     async (args: unknown) => {

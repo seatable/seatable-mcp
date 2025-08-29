@@ -1,6 +1,7 @@
 import axios, { AxiosError, AxiosInstance } from 'axios'
-import { logAxiosError } from './utils.js'
+
 import { getEnv } from '../config/env.js'
+import { logAxiosError } from './utils.js'
 
 export type TokenInfo = {
     token: string

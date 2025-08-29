@@ -1,12 +1,16 @@
+/* eslint-disable simple-import-sort/imports */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 
 import { getEnv } from '../config/env.js'
 import { logger } from '../logger.js'
 import { SeaTableClient } from '../seatable/client.js'
 import { MockSeaTableClient } from '../seatable/mockClient.js'
+
 import { registerAppendRows } from './tools/appendRows.js'
 import { registerAttachFileToRow } from './tools/attachFileToRow.js'
+import { registerBulkSetSelectOptions } from './tools/bulkSetSelectOptions.js'
 import { registerDeleteRows } from './tools/deleteRow.js'
+import { registerFindRows } from './tools/findRows.js'
 import { registerGetRow } from './tools/getRow.js'
 import { registerGetSchema } from './tools/getSchema.js'
 import { registerLinkRows } from './tools/linkRows.js'
@@ -18,8 +22,6 @@ import { registerPingSeatable } from './tools/pingSeatable.js'
 import { registerUnlinkRows } from './tools/unlinkRows.js'
 import { registerUpdateRows } from './tools/updateRow.js'
 import { registerUpsertRows } from './tools/upsertRows.js'
-import { registerFindRows } from './tools/findRows.js'
-import { registerBulkSetSelectOptions } from './tools/bulkSetSelectOptions.js'
 
 export function buildServer() {
     const env = getEnv()
