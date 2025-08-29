@@ -26,28 +26,38 @@ export const registerBulkSetSelectOptions: ToolRegistrar = (server, { client }) 
     async (args: unknown) => {
       const { table, updates } = Input.parse(args)
 
-      // Validate column types using current schema
-      const metaBefore = await client.getMetadata()
-      const genericBefore = mapMetadataToGeneric(metaBefore)
-      const tbl = genericBefore.tables.find((t) => t.name === table)
+      const meta = await client.getMetadata()
+      const generic = mapMetadataToGeneric(meta)
+      const tbl = generic.tables.find((t) => t.name === table)
       if (!tbl) throw new Error(`Unknown table: ${table}`)
 
       const results: any[] = []
       for (const u of updates) {
         const col = tbl.columns.find((c) => c.name === u.column)
         if (!col) throw new Error(`Unknown column: ${u.column}`)
-        if (col.type !== 'single_select' && col.type !== 'multi_select') {
-          throw new Error(`Column ${u.column} is type ${col.type}, expected single_select or multi_select`)
+        const hasOptions = !!(col as any).options && Array.isArray((col as any).options.options)
+        if (!hasOptions) throw new Error(`Column ${u.column} has no selectable options in schema`)
+        const current = (col as any).options.options as Array<{ id: string, name: string, color?: string }>
+        // Map provided names to existing ids where possible; if a provided name matches, include id, else skip (API requires id)
+        const toUpdate: Array<{ id: string, name?: string, color?: string }> = []
+        for (const opt of u.options) {
+          const match = current.find((c) => c.name === opt.name)
+          if (match) {
+            // Allow color change
+            toUpdate.push({ id: match.id, name: opt.name, color: opt.color })
+          }
         }
-        // Prefer common shape: data: { options: [...] }; client will try op_type variants and fallbacks
-        const res = await client.updateColumn(table, u.column, { data: { options: u.options } })
+        if (toUpdate.length === 0) {
+          results.push({ column: u.column, skipped: true, reason: 'no matching option ids by name' })
+          continue
+        }
+        const res = await (client as any).updateSelectOptions(table, u.column, toUpdate)
         results.push({ column: u.column, result: res })
       }
 
-      // Return updated schema snapshot for the table
-      const meta = await client.getMetadata()
-      const generic = mapMetadataToGeneric(meta)
-      const updatedTable = generic.tables.find((t) => t.name === table)
+      const metaAfter = await client.getMetadata()
+      const genericAfter = mapMetadataToGeneric(metaAfter)
+      const updatedTable = genericAfter.tables.find((t) => t.name === table)
 
       return { content: [{ type: 'text', text: JSON.stringify({ results, schema: updatedTable }) }] }
     }

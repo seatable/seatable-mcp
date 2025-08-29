@@ -11,8 +11,8 @@ export const registerPingSeatable: ToolRegistrar = (server, { client }) => {
         async () => {
             const started = Date.now()
             try {
-                // Use a lightweight metadata call as a ping
-                await client.listTables()
+                // Prefer metadata endpoint for compatibility
+                await client.getMetadata()
                 const latencyMs = Date.now() - started
                 return {
                     content: [

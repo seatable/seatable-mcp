@@ -13,6 +13,16 @@ const InputShape = {
   operations: z.array(OperationSchema)
 } as const
 
+function normalizeType(t: string): string {
+  const m: Record<string, string> = {
+    'single-select': 'single_select',
+    'multiple-select': 'multiple_select',
+    'multi-select': 'multiple_select',
+    'multi_select': 'multiple_select',
+  }
+  return m[t] || t
+}
+
 export const registerManageTables: ToolRegistrar = (server, { client }) => {
   server.registerTool(
     'manage_tables',
@@ -26,7 +36,26 @@ export const registerManageTables: ToolRegistrar = (server, { client }) => {
       const results: any[] = []
       for (const op of operations) {
         if (op.action === 'create') {
-          const res = await client.createTable(op.name, op.columns || [])
+          // Map columns to client expected shape and ensure at least one column
+          const requested = (op.columns || [])
+          let cols = requested.map((c: any) => {
+            const out: any = { column_name: c.name, column_type: normalizeType(c.type) }
+            if (c.options) out.data = c.options // older servers expect data.options
+            return out
+          })
+          if (cols.length === 0) {
+            cols = [{ column_name: 'Name', column_type: 'text' }]
+          }
+          const res = await client.createTable(op.name, cols)
+
+          // Safety: if API returned a table with 0 columns, add a default text column to avoid UI breakage
+          const hasCols = Array.isArray((res as any)?.columns) && (res as any).columns.length > 0
+          if (!hasCols) {
+            try {
+              await client.createColumn(op.name, { column_name: 'Name', column_type: 'text' })
+            } catch { /* ignore, best-effort safeguard */ }
+          }
+
           results.push({ action: 'create', result: res })
         } else if (op.action === 'rename') {
           const res = await client.renameTable(op.from, op.to)

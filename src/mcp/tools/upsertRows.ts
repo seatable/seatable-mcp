@@ -47,8 +47,9 @@ export const registerUpsertRows: ToolRegistrar = (server, { client }) => {
                 const filter: Record<string, unknown> = {}
                 for (const k of key_columns) filter[k] = row[k]
 
-                const found = await client.listRows({ table, filter, page: 1, page_size: 2 })
-                const matches = found.rows || []
+                // Use dedicated filter endpoint to avoid GET /rows ignoring filter params
+                const found = await client.searchRows(table, filter)
+                const matches = (found.rows || []).slice(0, 2)
 
                 if (matches.length > 1) {
                     throw makeError('ERR_UPSERT_AMBIGUOUS', 'Multiple matches for upsert key', { key_columns, filter })

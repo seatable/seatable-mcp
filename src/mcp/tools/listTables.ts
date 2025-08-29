@@ -7,7 +7,7 @@ const Input = z.object(InputShape)
 
 export const registerListTables: ToolRegistrar = (server, { client }) => {
     server.registerTool(
-        'listTables',
+        'list_tables',
         {
             title: 'List Tables',
             description: 'List tables in the SeaTable base',

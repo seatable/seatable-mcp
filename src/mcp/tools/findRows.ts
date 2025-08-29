@@ -135,6 +135,7 @@ export const registerFindRows: ToolRegistrar = (server, { client }) => {
       title: 'Find Rows',
       description:
         'Find rows using a predicate DSL. Filtering is performed client-side for broad compatibility. Supports and/or/not, eq, ne, in, gt/gte/lt/lte, contains, starts_with, ends_with, is_null.',
+      // Use Zod shape like other tools to keep SDK validation path consistent
       inputSchema: InputShape,
     },
     async (args: unknown) => {

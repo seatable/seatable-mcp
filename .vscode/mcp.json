@@ -1,44 +1,14 @@
 {
   // mcpServers: for clients like Claude Desktop / Claude for VS Code
-  "mcpServers": {
+  "servers": {
     "seatable": {
-      "command": "npm",
-      "args": ["run", "dev"],
-      "env": {
-        "SEATABLE_SERVER_URL": "http://localhost",
-        "SEATABLE_API_TOKEN": "test-token",
-        "SEATABLE_BASE_UUID": "test-base",
-        "SEATABLE_MOCK": "true",
-        "LOG_LEVEL": "info"
-      },
+      "command": "bash",
+      "args": [
+        "-lc",
+        "set -a; [ -f .env ] && . .env; set +a; node ./bin/seatable-mcp"
+      ],
       "cwd": "${workspaceFolder}",
       "transport": "stdio"
     }
-  },
-  // runtimes/servers: for clients that support workspace runtimes
-  "runtimes": {
-    "node": {
-      "command": "npm",
-      "args": ["run", "dev"],
-      "env": {
-        "SEATABLE_SERVER_URL": "http://localhost",
-        "SEATABLE_API_TOKEN": "test-token",
-        "SEATABLE_BASE_UUID": "test-base",
-        "SEATABLE_MOCK": "true",
-        "LOG_LEVEL": "info"
-      },
-      "stdio": true,
-      "cwd": "${workspaceFolder}"
-    }
-  },
-  "servers": [
-    {
-      "id": "seatable",
-      "name": "SeaTable MCP Server",
-      "runtime": "node",
-      "transport": {
-        "type": "stdio"
-      }
-    }
-  ]
+  }
 }
