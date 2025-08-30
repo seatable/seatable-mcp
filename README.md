@@ -9,7 +9,7 @@ This project implements a production-ready MCP server using the `@modelcontextpr
 ## Key Features
 
 - **Complete CRUD Operations**: Create, read, update, delete rows and tables
-- **Advanced Querying**: Client-side filtering with DSL and raw SQL support  
+- **Advanced Querying**: Client-side filtering with DSL and raw SQL support
 - **Schema Management**: Create, modify, and delete tables and columns
 - **Safe SQL Execution**: Parameterized queries with injection protection
 - **Real-time Health Monitoring**: Connection status and latency tracking
@@ -19,9 +19,10 @@ This project implements a production-ready MCP server using the `@modelcontextpr
 ## Architecture
 
 Built with a modern, proven architecture pattern:
+
 - **Server + setRequestHandler pattern**: Reliable MCP implementation following best practices from airtable-mcp-server
 - **Centralized tool management**: All tools managed in a single `handleListTools`/`handleCallTool` pattern
-- **Comprehensive validation**: Zod schemas for all inputs with detailed error messages  
+- **Comprehensive validation**: Zod schemas for all inputs with detailed error messages
 - **Type-safe client**: Full TypeScript support with proper error handling
 - **Flexible deployment**: Supports both API Gateway and direct SeaTable API endpoints
 
@@ -100,14 +101,16 @@ The mock implements in-memory tables and rows and returns synthetic metadata. Us
 Our server provides 11 comprehensive tools for complete SeaTable database management:
 
 ### Core Data Operations
+
 - **`list_tables`** - Get all tables with metadata
 - **`list_rows`** - Paginated row listing with filtering and sorting
 - **`get_row`** - Retrieve specific row by ID
 - **`append_rows`** - Add new rows (supports bulk operations)
-- **`update_rows`** - Modify existing rows (supports bulk operations)  
+- **`update_rows`** - Modify existing rows (supports bulk operations)
 - **`delete_rows`** - Remove rows by ID (supports bulk operations)
 
 ### Advanced Querying
+
 - **`find_rows`** - Client-side filtering with powerful DSL (supports and/or/not, eq, ne, in, gt/gte/lt/lte, contains, starts_with, ends_with, is_null)
 - **`query_sql`** - Execute raw SQL queries (SELECT, INSERT, UPDATE, DELETE) with parameterization
   - Supports complex JOINs, aggregations, and advanced SQL features
@@ -116,10 +119,12 @@ Our server provides 11 comprehensive tools for complete SeaTable database manage
   - Maximum 10,000 rows per query (default 100 if no LIMIT specified)
 
 ### Schema Management
+
 - **`get_schema`** - Get complete database structure and metadata
 - **`manage_tables`** - Create, rename, and delete tables
 
-### System Operations  
+### System Operations
+
 - **`ping_seatable`** - Health check with connection status and latency monitoring
 
 All tools include comprehensive input validation with Zod schemas and return structured JSON responses.
@@ -127,11 +132,12 @@ All tools include comprehensive input validation with Zod schemas and return str
 ## Tool Examples
 
 ### Basic Operations
+
 ```json
 // List all tables
 { "tool": "list_tables", "args": {} }
 
-// Get rows with pagination and filtering  
+// Get rows with pagination and filtering
 { "tool": "list_rows", "args": { "table": "Tasks", "page_size": 10, "order_by": "_ctime", "direction": "desc" } }
 
 // Add new rows
@@ -142,13 +148,14 @@ All tools include comprehensive input validation with Zod schemas and return str
 ```
 
 ### Advanced Querying
+
 ```json
 // Find rows with complex filters
-{ 
-  "tool": "find_rows", 
-  "args": { 
-    "table": "Tasks", 
-    "filter": { 
+{
+  "tool": "find_rows",
+  "args": {
+    "table": "Tasks",
+    "filter": {
       "and": [
         { "Status": { "eq": "Todo" } },
         { "Priority": { "in": ["High", "Medium"] } },
@@ -156,7 +163,7 @@ All tools include comprehensive input validation with Zod schemas and return str
       ]
     },
     "limit": 20
-  } 
+  }
 }
 
 // Execute raw SQL queries
@@ -164,6 +171,7 @@ All tools include comprehensive input validation with Zod schemas and return str
 ```
 
 ### Schema Management
+
 ```json
 // Create new table
 { "tool": "manage_tables", "args": { "operation": "create", "table_name": "Projects" } }
@@ -185,7 +193,7 @@ node scripts/mcp-call.cjs list_tables '{}'
 node scripts/mcp-call.cjs list_rows '{"table": "Tasks", "page_size": 5}'
 node scripts/mcp-call.cjs ping_seatable '{}'
 
-# Test advanced queries  
+# Test advanced queries
 node scripts/mcp-call.cjs find_rows '{"table": "Tasks", "filter": {"Status": "Todo"}}'
 node scripts/mcp-call.cjs query_sql '{"sql": "SELECT * FROM Tasks LIMIT 3"}'
 
@@ -197,18 +205,21 @@ node scripts/mcp-call.cjs manage_tables '{"operation": "create", "table_name": "
 ## Troubleshooting
 
 ### Connection Issues
+
 - Ensure `.env` values are correct and the API token has access to the base
 - Check network connectivity to `SEATABLE_SERVER_URL`
 - Use `ping_seatable` tool to verify connection and measure latency
 - If token exchange fails (404 on endpoints), set `SEATABLE_TOKEN_ENDPOINT_PATH` to your deployment's path
 
-### Query Issues  
+### Query Issues
+
 - For SQL errors, check the returned error message in the tool response
 - Use parameterized queries (`?` placeholders) to avoid SQL injection
 - Remember that SQL queries have a 10,000 row limit and default to 100 rows
 - Column names in SQL must match exactly (case-sensitive)
 
 ### Development
+
 - Use `SEATABLE_MOCK=true` for offline development and testing
 - Check logs for detailed request information including `op`, `method`, `url`, `status`, `request_id`, and `duration_ms`
 - Run individual tool tests with `node scripts/mcp-call.cjs <tool_name> '<args_json>'`
