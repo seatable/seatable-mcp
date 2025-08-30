@@ -1118,4 +1118,21 @@ export class SeaTableClient {
             }
         }
     }
+
+    async querySql(sql: string, parameters?: any[]): Promise<{ metadata: any; results: any[] }> {
+        // Use the API Gateway SQL endpoint
+        const h = await this.gwAuthHeader('bearer')
+        try {
+            const payload: any = { sql }
+            if (parameters && parameters.length > 0) {
+                payload.parameters = parameters
+            }
+            
+            const res = await this.limiter.schedule(() => this.gatewayHttp.post('/sql/', payload, { headers: h }))
+            return (res as any).data
+        } catch (error) {
+            logAxiosError(error, 'querySql')
+            throw toCodedAxiosError(error, 'querySql')
+        }
+    }
 }

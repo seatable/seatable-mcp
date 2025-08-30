@@ -6,7 +6,7 @@ const [,, toolName, argsJson] = process.argv;
 const toolArgs = argsJson ? JSON.parse(argsJson) : {};
 
 // Build before running so dist/ reflects latest src changes
-const cmd = "set -a; [ -f .env ] && . .env; set +a; npm run -s build && node ./bin/seatable-mcp";
+const cmd = "set -a; [ -f .env ] && . .env; set +a; node ./bin/seatable-mcp";
 
 const child = spawn('bash', ['-lc', cmd], {
   stdio: ['pipe', 'pipe', 'inherit'],

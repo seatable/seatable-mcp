@@ -2,40 +2,27 @@ import { z } from 'zod'
 
 import { ToolRegistrar } from './types.js'
 
-const InputShape = {
-    table: z.string(),
-    operations: z.array(
-        z.object({
-            action: z.enum(['create', 'rename', 'delete']),
-            name: z.string(),
-            new_name: z.string().optional(),
-            columns: z.array(z.record(z.string(), z.any())).optional(),
-        })
-    ),
-} as const
-
-const Input = z.object(InputShape)
-
 const OperationSchema = z.object({
-    operation: z.enum(['create', 'rename', 'delete']),
-    table_name: z.string(),
+    action: z.enum(['create', 'rename', 'delete']),
+    name: z.string(),
     new_name: z.string().optional(),
+    columns: z.array(z.record(z.string(), z.any())).optional(),
 })
 
 const InputSchema = z.object({
     operations: z.array(OperationSchema).min(1),
 })
 
-export const registerManageTables: ToolRegistrar = (server, { client }) => {
+export const registerManageTables: ToolRegistrar = (server, { client, getInputSchema }) => {
     server.registerTool(
         'manage_tables',
         {
             title: 'Manage Tables',
             description: 'Create, rename, and delete tables.',
-            inputSchema: InputSchema,
+            inputSchema: getInputSchema(InputSchema),
         },
         async (args: unknown) => {
-            const { operations } = Input.parse(args)
+            const { operations } = InputSchema.parse(args)
             const results = []
             for (const op of operations) {
                 if (op.action === 'create') {

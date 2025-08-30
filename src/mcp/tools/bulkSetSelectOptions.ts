@@ -7,13 +7,13 @@ const SelectOption = z.object({ name: z.string(), color: z.string().optional() }
 const ColumnUpdate = z.object({ column: z.string(), options: z.array(SelectOption).min(0) })
 const InputSchema = z.object({ table: z.string(), updates: z.array(ColumnUpdate).min(1) })
 
-export const registerBulkSetSelectOptions: ToolRegistrar = (server, { client }) => {
+export const registerBulkSetSelectOptions: ToolRegistrar = (server, { client, getInputSchema }) => {
   server.registerTool(
     'bulk_set_select_options',
     {
       title: 'Bulk Set Select Options',
       description: 'Bulk update select options for one or more select columns on a table. Only single_select and multi_select columns are supported.',
-      inputSchema: InputSchema,
+      inputSchema: getInputSchema(InputSchema),
     },
     async (args: unknown) => {
       const { table, updates } = InputSchema.parse(args)

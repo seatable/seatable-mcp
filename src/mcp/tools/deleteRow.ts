@@ -2,28 +2,21 @@ import { z } from 'zod'
 
 import { ToolRegistrar } from './types.js'
 
-const InputShape = {
-    table: z.string(),
-    row_ids: z.array(z.string()),
-} as const
-
-const Input = z.object(InputShape)
-
 const InputSchema = z.object({
     table: z.string(),
     row_ids: z.array(z.string()).min(1),
 })
 
-export const registerDeleteRows: ToolRegistrar = (server, { client }) => {
+export const registerDeleteRows: ToolRegistrar = (server, { client, getInputSchema }) => {
     server.registerTool(
         'delete_rows',
         {
             title: 'Delete Rows',
             description: 'Delete one or more rows from a table by their IDs.',
-            inputSchema: InputSchema,
+            inputSchema: getInputSchema(InputSchema),
         },
         async (args: unknown) => {
-            const { table, row_ids } = Input.parse(args)
+            const { table, row_ids } = InputSchema.parse(args)
             const results = []
             for (const row_id of row_ids) {
                 const res = await client.deleteRow(table, row_id)

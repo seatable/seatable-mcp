@@ -15,13 +15,13 @@ const Op = z.discriminatedUnion('action', [
 
 const InputSchema = z.object({ table: z.string(), operations: z.array(Op).min(1) })
 
-export const registerManageColumns: ToolRegistrar = (server, { client }) => {
+export const registerManageColumns: ToolRegistrar = (server, { client, getInputSchema }) => {
   server.registerTool(
     'manage_columns',
     {
       title: 'Manage Columns',
       description: 'Create, update, and delete columns with normalized schema outputs.',
-      inputSchema: InputSchema,
+      inputSchema: getInputSchema(InputSchema),
     },
     async (args: unknown) => {
       const { table, operations } = InputSchema.parse(args)

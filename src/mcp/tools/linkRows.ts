@@ -8,13 +8,13 @@ const InputSchema = z.object({
   pairs: z.array(z.object({ from_row_id: z.string(), to_row_id: z.string() })).min(1),
 })
 
-export const registerLinkRows: ToolRegistrar = (server, { client }) => {
+export const registerLinkRows: ToolRegistrar = (server, { client, getInputSchema }) => {
   server.registerTool(
     'link_rows',
     {
       title: 'Link Rows',
       description: 'Create links between rows by updating the link column with row IDs.',
-      inputSchema: InputSchema,
+      inputSchema: getInputSchema(InputSchema),
     },
     async (args: unknown) => {
       const { table, link_column, pairs } = InputSchema.parse(args)

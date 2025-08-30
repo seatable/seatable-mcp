@@ -22,13 +22,13 @@ function inferTypeFromValues(values: any[]): string {
     return 'text'
 }
 
-export const registerUpdateRows: ToolRegistrar = (server, { client }) => {
+export const registerUpdateRows: ToolRegistrar = (server, { client, getInputSchema }) => {
     server.registerTool(
         'update_rows',
         {
             title: 'Update Rows',
             description: 'Batch update rows. Rejects unknown columns unless allow_create_columns=true',
-            inputSchema: InputSchema,
+            inputSchema: getInputSchema(InputSchema),
         },
         async (args: unknown) => {
             const { table, updates, allow_create_columns } = InputSchema.parse(args)

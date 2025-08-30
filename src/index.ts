@@ -1,4 +1,6 @@
+/* eslint-disable simple-import-sort/imports */
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
+
 import { logger } from './logger.js'
 import { buildServer } from './mcp/server.js'
 
@@ -19,7 +21,7 @@ async function main() {
 
 main().catch((err) => {
     logger.error(err)
-    // eslint-disable-next-line no-console
+    // Mirror to stderr for visibility in non-MCP contexts
     console.error(err)
     process.exit(1)
 })

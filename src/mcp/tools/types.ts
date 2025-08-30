@@ -29,9 +29,11 @@ export interface ClientLike {
     updateRow(table: string, rowId: string, row: Record<string, unknown>): Promise<any>
     deleteRow(table: string, rowId: string): Promise<{ success: boolean }>
     searchRows(table: string, query: Record<string, unknown>): Promise<{ rows: any[]; page?: number; page_size?: number; total?: number }>
+    // SQL
+    querySql(sql: string, parameters?: any[]): Promise<{ metadata: any; results: any[] }>
 }
 
 export type ToolRegistrar = (
     server: McpServerLike,
-    deps: { client: ClientLike; env: Env }
+    deps: { client: ClientLike; env: Env; getInputSchema: (schema: any) => any }
 ) => void

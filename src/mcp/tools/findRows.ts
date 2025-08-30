@@ -39,7 +39,7 @@ export const Where: z.ZodTypeAny = z.lazy(() =>
 export type Where = z.infer<typeof Where>
 
 // Use a loose schema for boundary parsing
-const LooseInput = z.object({
+const InputSchema = z.object({
   table: z.string(),
   where: z.unknown(),
   page: z.number().int().min(1).optional().default(1),
@@ -47,20 +47,6 @@ const LooseInput = z.object({
   order_by: z.string().optional(),
   direction: z.enum(['asc', 'desc']).optional().default('asc'),
 })
-
-// Public input schema exposed to clients (explicit JSON schema to avoid recursive/array conversion issues)
-const PublicInputJsonSchema = {
-  type: 'object',
-  properties: {
-    table: { type: 'string' },
-    where: { type: 'object', additionalProperties: true, description: 'A DSL object for filtering rows' },
-    page: { type: 'integer', minimum: 1, default: 1 },
-    page_size: { type: 'integer', minimum: 1, maximum: 1000, default: 100 },
-    order_by: { type: 'string' },
-    direction: { type: 'string', enum: ['asc', 'desc'], default: 'asc' },
-  },
-  required: ['table', 'where'],
-} as const
 
 function toStringSafe(v: unknown): string {
   return v == null ? '' : String(v)
@@ -143,17 +129,17 @@ export function evalWhere(row: SeaTableRow, where: any): boolean {
   return false
 }
 
-export const registerFindRows: ToolRegistrar = (server, { client }) => {
+export const registerFindRows: ToolRegistrar = (server, { client, getInputSchema }) => {
   server.registerTool(
     'find_rows_v2',
     {
       title: 'Find Rows',
       description:
         'Find rows using a predicate DSL. Filtering is performed client-side for broad compatibility. Supports and/or/not, eq, ne, in, gt/gte/lt/lte, contains, starts_with, ends_with, is_null.',
-      inputSchema: {},
+      inputSchema: getInputSchema(InputSchema),
     },
     async (args: unknown) => {
-      const parsed = LooseInput.parse(args)
+      const parsed = InputSchema.parse(args)
       const pageSizeFetch = 1000
       const maxPages = 50 // safety cap (50k rows scanned)
       let page = 1

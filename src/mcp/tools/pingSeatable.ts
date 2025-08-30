@@ -1,12 +1,15 @@
+import { z } from 'zod'
 import { ToolRegistrar } from './types.js'
 
-export const registerPingSeatable: ToolRegistrar = (server, { client }) => {
+const InputSchema = z.object({})
+
+export const registerPingSeatable: ToolRegistrar = (server, { client, getInputSchema }) => {
     server.registerTool(
         'ping_seatable',
         {
             title: 'Ping SeaTable',
             description: 'Health check that verifies connectivity and auth to SeaTable',
-            inputSchema: {},
+            inputSchema: getInputSchema(InputSchema),
         },
         async () => {
             const started = Date.now()

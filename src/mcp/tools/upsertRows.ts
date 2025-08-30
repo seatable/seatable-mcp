@@ -5,15 +5,6 @@ import { mapMetadataToGeneric } from '../../schema/map.js'
 import { validateRowsAgainstSchema } from '../../schema/validate.js'
 import { ToolRegistrar } from './types.js'
 
-const InputShape = {
-    table: z.string(),
-    key_columns: z.array(z.string()).min(1),
-    rows: z.array(z.record(z.any())),
-    allow_create_columns: z.boolean().optional(),
-} as const
-
-const Input = z.object(InputShape)
-
 const InputSchema = z.object({
     table: z.string(),
     key_columns: z.array(z.string()).min(1),
@@ -21,16 +12,16 @@ const InputSchema = z.object({
     allow_create_columns: z.boolean().optional(),
 })
 
-export const registerUpsertRows: ToolRegistrar = (server, { client }) => {
+export const registerUpsertRows: ToolRegistrar = (server, { client, getInputSchema }) => {
     server.registerTool(
         'upsert_rows',
         {
             title: 'Batch Upsert Rows',
             description: 'Batch upsert rows by matching on one or more key columns. If a match exists, update it; otherwise insert a new row. Rejects unknown columns unless allow_create_columns=true.',
-            inputSchema: InputSchema,
+            inputSchema: getInputSchema(InputSchema),
         },
         async (args: unknown) => {
-            const { table, key_columns, rows, allow_create_columns } = Input.parse(args)
+            const { table, key_columns, rows, allow_create_columns } = InputSchema.parse(args)
 
             // Validate payload against schema and unknown column policy
             const metadata = await client.getMetadata()

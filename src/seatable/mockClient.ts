@@ -124,4 +124,16 @@ export class MockSeaTableClient {
   async searchRows(table: string, query: Record<string, unknown>): Promise<ListRowsResponse> {
     return this.listRows({ table, filter: query })
   }
+
+  async querySql(sql: string, parameters?: any[]): Promise<{ metadata: any; results: any[] }> {
+    // Mock implementation - just return empty results for now
+    return {
+      metadata: { 
+        table_count: this.tables.size,
+        sql_query: sql,
+        parameters: parameters || []
+      },
+      results: []
+    }
+  }
 }
