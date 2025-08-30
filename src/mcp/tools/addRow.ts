@@ -1,4 +1,5 @@
 import { z } from 'zod'
+
 import { ToolRegistrar } from './types.js'
 
 const InputSchema = z.object({ table: z.string(), row: z.record(z.any()) })

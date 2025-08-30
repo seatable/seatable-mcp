@@ -2,7 +2,21 @@
 
 A comprehensive MCP (Model Context Protocol) server that provides full SeaTable database access through 11 powerful tools.
 
-## What is this?
+## Quick Start
+
+1. Configure your MCP client (Claude, Cursor, or VSCode) to use:
+
+   ```
+   command: npx
+   args: ["mcp-seatable"]
+   ```
+
+2. Set your environment variables:
+   - `SEATABLE_SERVER_URL`: Your SeaTable server URL
+   - `SEATABLE_API_TOKEN`: Your SeaTable API token
+   - `SEATABLE_BASE_UUID`: Your SeaTable base UUID
+
+3. Restart your MCP client and start using SeaTable tools!## What is this?
 
 This project implements a production-ready MCP server using the `@modelcontextprotocol/sdk` that integrates with SeaTable's REST API. It provides a complete toolkit for database operations including CRUD operations, advanced querying, schema management, and raw SQL execution. All tools use Zod validation and return structured JSON responses.
 
@@ -26,65 +40,111 @@ Built with a modern, proven architecture pattern:
 - **Type-safe client**: Full TypeScript support with proper error handling
 - **Flexible deployment**: Supports both API Gateway and direct SeaTable API endpoints
 
-## Prerequisites
+## Installation
 
-- Node.js >= 18
-- npm
-- A SeaTable server URL and API token with access to your base
+No installation required! This MCP server can be used directly with `npx mcp-seatable`.
 
-## Setup
-
-1. Clone/open this repo.
-2. Copy `.env.example` to `.env` and set values.
-3. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-## Configuration (.env)
-
-See `.env.example` for required variables:
-
-- `SEATABLE_SERVER_URL`
-- `SEATABLE_API_TOKEN`
-- `SEATABLE_BASE_UUID`
-- `SEATABLE_TABLE_NAME` (optional default table)
-- `SEATABLE_MOCK` (optional; set to `true` or `1` to use in-memory mock client for local testing)
-- `SEATABLE_ACCESS_TOKEN_EXP` (optional; expiry passed to app-access-token endpoint, e.g., `3d` or `1h`; default `1h`)
-- `SEATABLE_TOKEN_ENDPOINT_PATH` (optional; override token exchange path. Use either the full app-access-token path like `/api/v2.1/dtable/app-access-token/` or a base like `/api/v2.1` or `/dtable-server/api/v1`)
-
-## Scripts
-
-- `npm run dev` – Start server in watch mode (tsx)
-- `npm run build` – Compile TypeScript
-- `npm start` – Run compiled server
-- `npm run test` – Run tests (vitest)
-- `npm run test:watch` – Watch tests
-- `npm run lint` – Lint
-- `npm run lint:fix` – Lint and fix
-- `npm run format` – Prettier check
-- `npm run typecheck` – TypeScript type check
-
-## Running in Development
+Alternatively, you can install globally:
 
 ```bash
-npm run dev
+npm install -g mcp-seatable
 ```
 
-The server will validate your environment variables on startup and log a clear error if something is missing or invalid.
+## Usage
 
-## Running in Production
+### Claude Desktop
+
+To use with Claude Desktop, add the server config:
+
+On MacOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "seatable": {
+      "command": "npx",
+      "args": ["mcp-seatable"],
+      "env": {
+        "SEATABLE_SERVER_URL": "https://your-seatable-server.com",
+        "SEATABLE_API_TOKEN": "your-api-token",
+        "SEATABLE_BASE_UUID": "your-base-uuid"
+      }
+    }
+  }
+}
+```
+
+### Cursor
+
+Add to your Cursor settings by opening the command palette (`Cmd/Ctrl+Shift+P`) and selecting "Preferences: Open Settings (JSON)":
+
+```json
+{
+  "mcp.servers": {
+    "seatable": {
+      "command": "npx",
+      "args": ["mcp-seatable"],
+      "env": {
+        "SEATABLE_SERVER_URL": "https://your-seatable-server.com",
+        "SEATABLE_API_TOKEN": "your-api-token",
+        "SEATABLE_BASE_UUID": "your-base-uuid"
+      }
+    }
+  }
+}
+```
+
+### VSCode with GitHub Copilot
+
+Install the MCP extension for VSCode, then add to your VSCode settings.json:
+
+```json
+{
+  "mcp.servers": {
+    "seatable": {
+      "command": "npx",
+      "args": ["mcp-seatable"],
+      "env": {
+        "SEATABLE_SERVER_URL": "https://your-seatable-server.com",
+        "SEATABLE_API_TOKEN": "your-api-token",
+        "SEATABLE_BASE_UUID": "your-base-uuid"
+      }
+    }
+  }
+}
+```
+
+### Environment Variables
+
+All configuration is done through environment variables:
+
+- `SEATABLE_SERVER_URL` - Your SeaTable server URL
+- `SEATABLE_API_TOKEN` - Your SeaTable API token
+- `SEATABLE_BASE_UUID` - Your SeaTable base UUID
+- `SEATABLE_TABLE_NAME` - Optional default table name
+- `SEATABLE_MOCK` - Set to `true` for offline testing with mock data
+- `SEATABLE_ACCESS_TOKEN_EXP` - Token expiry (default: `1h`)
+- `SEATABLE_TOKEN_ENDPOINT_PATH` - Custom token endpoint path if needed## Programmatic Usage
+
+You can also use mcp-seatable as a library in your Node.js applications:
 
 ```bash
-npm run build
-npm start
+npm install mcp-seatable
 ```
 
-## CLI
+```typescript
+import { createMcpServer } from 'mcp-seatable'
 
-- Dev: `tsx src/index.ts`
-- Built: `node dist/index.js`
-- NPM bin: `seatable-mcp` (after build)
+// Create and start the MCP server
+const server = await createMcpServer({
+  serverUrl: 'https://your-seatable-server.com',
+  apiToken: 'your-api-token',
+  baseUuid: 'your-base-uuid',
+})
+
+// The server will handle MCP protocol communications
+```
 
 ## Mock Mode
 
@@ -223,6 +283,52 @@ node scripts/mcp-call.cjs manage_tables '{"operation": "create", "table_name": "
 - Use `SEATABLE_MOCK=true` for offline development and testing
 - Check logs for detailed request information including `op`, `method`, `url`, `status`, `request_id`, and `duration_ms`
 - Run individual tool tests with `node scripts/mcp-call.cjs <tool_name> '<args_json>'`
+
+## Development
+
+### Prerequisites
+
+- Node.js >= 18
+- npm
+
+### Setup for Development
+
+1. Clone this repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Copy `.env.example` to `.env` and configure your SeaTable settings
+4. Run in development mode:
+   ```bash
+   npm run dev
+   ```
+
+### Development Scripts
+
+- `npm run dev` – Start server in watch mode (tsx)
+- `npm run build` – Compile TypeScript
+- `npm run start` – Run compiled server
+- `npm run test` – Run tests (vitest)
+- `npm run test:watch` – Watch tests
+- `npm run lint` – Lint code
+- `npm run lint:fix` – Lint and fix issues
+- `npm run format` – Check formatting
+- `npm run typecheck` – TypeScript type check
+
+### Running from Source
+
+```bash
+# Development
+npm run dev
+
+# Production build
+npm run build
+npm run start
+
+# Direct execution
+npx tsx src/index.ts
+```
 
 ## License
 

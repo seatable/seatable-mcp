@@ -1,10 +1,45 @@
 {
   "name": "mcp-seatable",
-  "version": "0.1.0",
-  "private": true,
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
-  "description": "MCP server for SeaTable integration",
+  "description": "A comprehensive MCP (Model Context Protocol) server that provides full SeaTable database access through 11 powerful tools",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "seatable",
+    "database",
+    "api",
+    "server",
+    "ai",
+    "assistant",
+    "sql",
+    "crud"
+  ],
+  "author": "Brian Money",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/brianmoney/mcp-seatable.git"
+  },
+  "bugs": {
+    "url": "https://github.com/brianmoney/mcp-seatable/issues"
+  },
+  "homepage": "https://github.com/brianmoney/mcp-seatable#readme",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "bin",
+    "README.md",
+    "LICENSE",
+    ".env.example"
+  ],
   "bin": {
     "seatable-mcp": "bin/seatable-mcp.cjs"
   },
@@ -18,7 +53,9 @@
     "lint:fix": "eslint . --ext .ts --fix",
     "format": "prettier --check .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "setup:hooks": "git config core.hooksPath .githooks"
+    "setup:hooks": "git config core.hooksPath .githooks",
+    "prepublishOnly": "npm run build && npm run test && npm run lint",
+    "prepare": "npm run build"
   },
   "engines": {
     "node": ">=18"

@@ -172,7 +172,7 @@ export class SeaTableMCPServer {
                 inputSchema: getInputSchema(z.object({
                     sql: z.string().describe('The SQL query to execute (e.g., "SELECT * FROM Table1 WHERE Name=?")')
                         .refine(sql => sql.trim().length > 0, 'SQL query cannot be empty'),
-                    parameters: z.array(z.any()).optional().describe('Parameters to replace ? placeholders in the SQL query'),
+                    parameters: z.array(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional().describe('Parameters to replace ? placeholders in the SQL query'),
                 })),
             },
             ],
@@ -377,7 +377,7 @@ export class SeaTableMCPServer {
                 case 'query_sql': {
                     const QuerySqlSchema = z.object({
                         sql: z.string().refine(sql => sql.trim().length > 0, 'SQL query cannot be empty'),
-                        parameters: z.array(z.any()).optional(),
+                        parameters: z.array(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
                     })
                     const args = QuerySqlSchema.parse(request.params.arguments)
                     
