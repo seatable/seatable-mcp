@@ -5,7 +5,7 @@
       "command": "bash",
       "args": [
         "-lc",
-        "set -a; [ -f .env ] && . .env; set +a; node ./bin/seatable-mcp"
+        "set -a; [ -f .env ] && . .env; set +a; npm run -s build && node ./bin/seatable-mcp"
       ],
       "cwd": "${workspaceFolder}",
       "transport": "stdio"

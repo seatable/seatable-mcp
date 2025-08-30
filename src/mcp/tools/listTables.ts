@@ -5,13 +5,15 @@ import { ToolRegistrar } from './types.js'
 const InputShape = {} as const
 const Input = z.object(InputShape)
 
+const InputSchema = z.object({})
+
 export const registerListTables: ToolRegistrar = (server, { client }) => {
     server.registerTool(
         'list_tables',
         {
             title: 'List Tables',
             description: 'List tables in the SeaTable base',
-            inputSchema: InputShape,
+            inputSchema: InputSchema,
         },
         async (_args: unknown) => {
             const _ = Input.parse({})

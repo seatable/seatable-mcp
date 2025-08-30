@@ -5,7 +5,7 @@ import { ToolRegistrar } from './types.js'
 
 const SelectOption = z.object({ name: z.string(), color: z.string().optional() })
 const ColumnUpdate = z.object({ column: z.string(), options: z.array(SelectOption).min(0) })
-const Input = z.object({ table: z.string(), updates: z.array(ColumnUpdate).min(1) })
+const InputSchema = z.object({ table: z.string(), updates: z.array(ColumnUpdate).min(1) })
 
 export const registerBulkSetSelectOptions: ToolRegistrar = (server, { client }) => {
   server.registerTool(
@@ -13,35 +13,10 @@ export const registerBulkSetSelectOptions: ToolRegistrar = (server, { client }) 
     {
       title: 'Bulk Set Select Options',
       description: 'Bulk update select options for one or more select columns on a table. Only single_select and multi_select columns are supported.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          table: { type: 'string' },
-          updates: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                column: { type: 'string' },
-                options: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: { name: { type: 'string' }, color: { type: 'string' } },
-                    required: ['name'],
-                  },
-                },
-              },
-              required: ['column', 'options'],
-            },
-            minItems: 1,
-          },
-        },
-        required: ['table', 'updates'],
-      },
+      inputSchema: InputSchema,
     },
     async (args: unknown) => {
-      const { table, updates } = Input.parse(args)
+      const { table, updates } = InputSchema.parse(args)
 
       const meta = await client.getMetadata()
       const generic = mapMetadataToGeneric(meta)

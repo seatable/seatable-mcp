@@ -3,7 +3,7 @@ import { z } from 'zod'
 import type { SeaTableRow } from '../../seatable/types.js'
 import { ToolRegistrar } from './types.js'
 
-// Zod schema for the DSL
+// Zod schema for the DSL (kept for reference/tests but not enforced at the boundary)
 const FieldRef = z.object({ field: z.string() })
 const Eq = z.object({ eq: FieldRef.extend({ value: z.any() }) })
 const Ne = z.object({ ne: FieldRef.extend({ value: z.any() }) })
@@ -38,10 +38,10 @@ export const Where: z.ZodTypeAny = z.lazy(() =>
 )
 export type Where = z.infer<typeof Where>
 
-// Strict internal input (uses full DSL)
-const InternalInput = z.object({
+// Use a loose schema for boundary parsing
+const LooseInput = z.object({
   table: z.string(),
-  where: Where,
+  where: z.unknown(),
   page: z.number().int().min(1).optional().default(1),
   page_size: z.number().int().min(1).max(1000).optional().default(100),
   order_by: z.string().optional(),
@@ -53,11 +53,11 @@ const PublicInputJsonSchema = {
   type: 'object',
   properties: {
     table: { type: 'string' },
-    where: { type: 'object', additionalProperties: true },
-    page: { type: 'integer', minimum: 1 },
-    page_size: { type: 'integer', minimum: 1, maximum: 1000 },
+    where: { type: 'object', additionalProperties: true, description: 'A DSL object for filtering rows' },
+    page: { type: 'integer', minimum: 1, default: 1 },
+    page_size: { type: 'integer', minimum: 1, maximum: 1000, default: 100 },
     order_by: { type: 'string' },
-    direction: { type: 'string', enum: ['asc', 'desc'] },
+    direction: { type: 'string', enum: ['asc', 'desc'], default: 'asc' },
   },
   required: ['table', 'where'],
 } as const
@@ -145,15 +145,15 @@ export function evalWhere(row: SeaTableRow, where: any): boolean {
 
 export const registerFindRows: ToolRegistrar = (server, { client }) => {
   server.registerTool(
-    'find_rows',
+    'find_rows_v2',
     {
       title: 'Find Rows',
       description:
         'Find rows using a predicate DSL. Filtering is performed client-side for broad compatibility. Supports and/or/not, eq, ne, in, gt/gte/lt/lte, contains, starts_with, ends_with, is_null.',
-      inputSchema: PublicInputJsonSchema,
+      inputSchema: {},
     },
     async (args: unknown) => {
-      const parsed = InternalInput.parse(args)
+      const parsed = LooseInput.parse(args)
       const pageSizeFetch = 1000
       const maxPages = 50 // safety cap (50k rows scanned)
       let page = 1

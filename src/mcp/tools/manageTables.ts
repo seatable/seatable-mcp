@@ -16,33 +16,23 @@ const InputShape = {
 
 const Input = z.object(InputShape)
 
+const OperationSchema = z.object({
+    operation: z.enum(['create', 'rename', 'delete']),
+    table_name: z.string(),
+    new_name: z.string().optional(),
+})
+
+const InputSchema = z.object({
+    operations: z.array(OperationSchema).min(1),
+})
+
 export const registerManageTables: ToolRegistrar = (server, { client }) => {
     server.registerTool(
         'manage_tables',
         {
             title: 'Manage Tables',
             description: 'Create, rename, and delete tables.',
-            inputSchema: {
-                type: 'object',
-                properties: {
-                    table: { type: 'string' },
-                    operations: {
-                        type: 'array',
-                        items: {
-                            type: 'object',
-                            properties: {
-                                action: { type: 'string', enum: ['create', 'rename', 'delete'] },
-                                name: { type: 'string' },
-                                new_name: { type: 'string' },
-                                columns: { type: 'array', items: { type: 'object' } },
-                            },
-                            required: ['action', 'name'],
-                        },
-                        minItems: 1,
-                    },
-                },
-                required: ['table', 'operations'],
-            },
+            inputSchema: InputSchema,
         },
         async (args: unknown) => {
             const { operations } = Input.parse(args)

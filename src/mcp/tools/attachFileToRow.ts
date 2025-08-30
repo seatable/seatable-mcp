@@ -17,19 +17,25 @@ const Input = z.object({
 
 const MAX_BYTES = 5 * 1024 * 1024
 
-export const registerAttachFileToRow: ToolRegistrar = (server) => {
-  server.registerTool(
-    'attach_file_to_row',
-    {
-      title: 'Attach File to Row',
-      description: 'Attach a file to a row via URL or base64 bytes (<= 5 MB).',
-      inputSchema: {
-        table: z.string(),
-        row_id: z.string(),
-        column: z.string(),
-        file: z.any(),
-      },
-    },
+const InputSchema = z.object({
+    table: z.string(),
+    row_id: z.string(),
+    column_name: z.string(),
+    file_url: z.string().url().optional(),
+    file_name: z.string().optional(),
+    file_data: z.string().optional(),
+}).refine(data => data.file_url || data.file_data, {
+    message: "Either file_url or file_data must be provided"
+})
+
+export const registerAttachFileToRow: ToolRegistrar = (server, { client }) => {
+    server.registerTool(
+        'attach_file_to_row',
+        {
+            title: 'Attach File to Row',
+            description: 'Attach a file to a row via URL or base64 bytes (<= 5 MB).',
+            inputSchema: InputSchema,
+        },
     async (args: unknown) => {
       const { table, row_id, column, file } = Input.parse(args)
 

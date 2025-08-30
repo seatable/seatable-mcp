@@ -13,7 +13,7 @@ const Op = z.discriminatedUnion('action', [
   z.object({ action: z.literal('delete'), delete: Delete }),
 ])
 
-const Input = z.object({ table: z.string(), operations: z.array(Op).min(1) })
+const InputSchema = z.object({ table: z.string(), operations: z.array(Op).min(1) })
 
 export const registerManageColumns: ToolRegistrar = (server, { client }) => {
   server.registerTool(
@@ -21,30 +21,10 @@ export const registerManageColumns: ToolRegistrar = (server, { client }) => {
     {
       title: 'Manage Columns',
       description: 'Create, update, and delete columns with normalized schema outputs.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          table: { type: 'string' },
-          operations: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                action: { type: 'string', enum: ['create', 'update', 'delete'] },
-                create: { type: 'object' },
-                update: { type: 'object' },
-                delete: { type: 'object' },
-              },
-              required: ['action'],
-            },
-            minItems: 1,
-          },
-        },
-        required: ['table', 'operations'],
-      },
+      inputSchema: InputSchema,
     },
     async (args: unknown) => {
-      const { table, operations } = Input.parse(args)
+      const { table, operations } = InputSchema.parse(args)
       const results: any[] = []
 
       for (const op of operations) {

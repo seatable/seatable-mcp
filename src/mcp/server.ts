@@ -25,10 +25,10 @@ import { registerUpsertRows } from './tools/upsertRows.js'
 
 export function buildServer() {
     const env = getEnv()
-    const server = new McpServer({ name: 'mcp-seatable', version: '0.1.0' })
+    const server = new McpServer({ name: 'mcp-seatable', version: '0.1.1' })
     const client = (env.SEATABLE_MOCK ? new MockSeaTableClient() : new SeaTableClient()) as unknown as SeaTableClient
 
-    // Register tools (strictly per plan)
+    // Register tools
     registerListTables(server, { client, env })
     registerListRows(server, { client, env })
     registerGetRow(server, { client, env })
@@ -43,7 +43,9 @@ export function buildServer() {
     registerAttachFileToRow(server, { client, env })
     registerPingSeatable(server, { client, env })
     registerGetSchema(server, { client, env })
-    registerFindRows(server, { client, env })
+    if (env.SEATABLE_ENABLE_FIND_ROWS !== false) {
+        registerFindRows(server, { client, env })
+    }
     registerBulkSetSelectOptions(server, { client, env })
 
     logger.info('MCP server built')

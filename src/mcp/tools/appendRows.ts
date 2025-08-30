@@ -10,21 +10,19 @@ const InputShape = {
 
 const Input = z.object(InputShape)
 
+const InputSchema = z.object({
+    table: z.string(),
+    rows: z.array(z.record(z.string(), z.any())).min(1),
+    allow_create_columns: z.boolean().optional(),
+})
+
 export const registerAppendRows: ToolRegistrar = (server, { client }) => {
     server.registerTool(
         'append_rows',
         {
             title: 'Append Rows',
             description: 'Batch insert rows. Rejects unknown columns unless allow_create_columns=true',
-            inputSchema: {
-                type: 'object',
-                properties: {
-                    table: { type: 'string' },
-                    rows: { type: 'array', items: { type: 'object' } },
-                    allow_create_columns: { type: 'boolean' },
-                },
-                required: ['table', 'rows'],
-            },
+            inputSchema: InputSchema,
         },
         async (args: unknown) => {
             const { table, rows, allow_create_columns } = Input.parse(args)

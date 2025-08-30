@@ -7,13 +7,18 @@ const InputShape = {
     rowId: z.string(),
 } as const
 
+const InputSchema = z.object({
+    table: z.string(),
+    rowId: z.string(),
+})
+
 export const registerGetRow: ToolRegistrar = (server, { client }) => {
     server.registerTool(
         'get_row',
         {
             title: 'Get Row',
             description: 'Get a row by ID from a table',
-            inputSchema: InputShape,
+            inputSchema: InputSchema,
         },
         async (args: unknown) => {
             const parsed = z.object(InputShape).parse(args)

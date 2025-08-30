@@ -14,23 +14,20 @@ const InputShape = {
 
 const Input = z.object(InputShape)
 
+const InputSchema = z.object({
+    table: z.string(),
+    key_columns: z.array(z.string()).min(1),
+    rows: z.array(z.record(z.string(), z.any())).min(1),
+    allow_create_columns: z.boolean().optional(),
+})
+
 export const registerUpsertRows: ToolRegistrar = (server, { client }) => {
     server.registerTool(
         'upsert_rows',
         {
-            title: 'Upsert Rows',
-            description:
-                'Batch upsert rows by matching on one or more key columns. If a match exists, update it; otherwise insert a new row. Rejects unknown columns unless allow_create_columns=true.',
-            inputSchema: {
-                type: 'object',
-                properties: {
-                    table: { type: 'string' },
-                    key_columns: { type: 'array', items: { type: 'string' }, minItems: 1 },
-                    rows: { type: 'array', items: { type: 'object' } },
-                    allow_create_columns: { type: 'boolean' },
-                },
-                required: ['table', 'key_columns', 'rows'],
-            },
+            title: 'Batch Upsert Rows',
+            description: 'Batch upsert rows by matching on one or more key columns. If a match exists, update it; otherwise insert a new row. Rejects unknown columns unless allow_create_columns=true.',
+            inputSchema: InputSchema,
         },
         async (args: unknown) => {
             const { table, key_columns, rows, allow_create_columns } = Input.parse(args)

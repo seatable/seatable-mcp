@@ -22,6 +22,12 @@ const EnvSchema = z.object({
     SEATABLE_TOKEN_ENDPOINT_PATH: z.string().optional(),
     // Expiry string passed to app-access-token endpoint, e.g., '3d', '1h'
     SEATABLE_ACCESS_TOKEN_EXP: z.string().optional(),
+    // Feature flags
+    SEATABLE_ENABLE_FIND_ROWS: z
+        .string()
+        .optional()
+        .transform((v) => (v === '1' || v === 'true' ? true : false))
+        .optional(),
 })
 
 export type Env = z.infer<typeof EnvSchema>
