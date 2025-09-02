@@ -1,6 +1,6 @@
 version: '3.8'
 services:
-  mcp-seatable:
+  aspereo-mcp-seatable:
     build: .
     environment:
       - SEATABLE_SERVER_URL=${SEATABLE_SERVER_URL}

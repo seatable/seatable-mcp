@@ -6,10 +6,10 @@ A comprehensive MCP (Model Context Protocol) server that provides full SeaTable 
 
 1. Configure your MCP client (Claude, Cursor, or VSCode) to use:
 
-   ```
-   command: npx
-   args: ["mcp-seatable"]
-   ```
+```
+command: npx
+args: ["@aspereo/mcp-seatable"]
+```
 
 2. Set your environment variables:
    - `SEATABLE_SERVER_URL`: Your SeaTable server URL
@@ -42,12 +42,12 @@ Built with a modern, proven architecture pattern:
 
 ## Installation
 
-No installation required! This MCP server can be used directly with `npx mcp-seatable`.
+No installation required! This MCP server can be used directly with `npx @aspereo/mcp-seatable`.
 
 Alternatively, you can install globally:
 
 ```bash
-npm install -g mcp-seatable
+npm install -g @aspereo/mcp-seatable
 ```
 
 ## Usage
@@ -64,7 +64,7 @@ On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
   "mcpServers": {
     "seatable": {
       "command": "npx",
-      "args": ["mcp-seatable"],
+      "args": ["@aspereo/mcp-seatable"],
       "env": {
         "SEATABLE_SERVER_URL": "https://your-seatable-server.com",
         "SEATABLE_API_TOKEN": "your-api-token",
@@ -84,7 +84,7 @@ Add to your Cursor settings by opening the command palette (`Cmd/Ctrl+Shift+P`) 
   "mcp.servers": {
     "seatable": {
       "command": "npx",
-      "args": ["mcp-seatable"],
+      "args": ["@aspereo/mcp-seatable"],
       "env": {
         "SEATABLE_SERVER_URL": "https://your-seatable-server.com",
         "SEATABLE_API_TOKEN": "your-api-token",
@@ -104,7 +104,7 @@ Install the MCP extension for VSCode, then add to your VSCode settings.json:
   "mcp.servers": {
     "seatable": {
       "command": "npx",
-      "args": ["mcp-seatable"],
+      "args": ["@aspereo/mcp-seatable"],
       "env": {
         "SEATABLE_SERVER_URL": "https://your-seatable-server.com",
         "SEATABLE_API_TOKEN": "your-api-token",
@@ -130,11 +130,11 @@ All configuration is done through environment variables:
 You can also use mcp-seatable as a library in your Node.js applications:
 
 ```bash
-npm install mcp-seatable
+npm install @aspereo/mcp-seatable
 ```
 
 ```typescript
-import { createMcpServer } from 'mcp-seatable'
+import { createMcpServer } from '@aspereo/mcp-seatable'
 
 // Create and start the MCP server
 const server = await createMcpServer({

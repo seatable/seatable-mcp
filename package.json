@@ -1,6 +1,6 @@
 {
-  "name": "mcp-seatable",
-  "version": "1.0.0",
+  "name": "@aspereo/mcp-seatable",
+  "version": "1.0.1",
   "type": "module",
   "license": "MIT",
   "description": "A comprehensive MCP (Model Context Protocol) server that provides full SeaTable database access through 11 powerful tools",
@@ -41,7 +41,11 @@
     ".env.example"
   ],
   "bin": {
-    "seatable-mcp": "bin/seatable-mcp.cjs"
+    "seatable-mcp": "bin/seatable-mcp.cjs",
+    "mcp-seatable": "bin/seatable-mcp.cjs"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",

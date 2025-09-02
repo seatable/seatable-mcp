@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+## [1.0.1] - 2025-09-02
+
+### Fixed
+
+- Add npm bin alias `mcp-seatable` so `npx mcp-seatable` works in Claude/Cursor/VSCode configurations.
+
 #### Core Features
 
 - Complete MCP (Model Context Protocol) server implementation with 11 comprehensive tools

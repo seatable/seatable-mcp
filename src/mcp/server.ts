@@ -47,7 +47,7 @@ export class SeaTableMCPServer {
         this.client = client
         this.server = new Server(
             {
-                name: 'mcp-seatable',
+                name: '@aspereo/mcp-seatable',
                 version: '0.1.1',
             },
             {
