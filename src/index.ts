@@ -43,6 +43,11 @@ async function main() {
     logger.info('MCP SeaTable server running (stdio)')
 }
 
+// Exported CLI entry for bin launcher (used by npx)
+export async function runCli() {
+    return main()
+}
+
 // Only run main if this file is being executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
     main().catch((err) => {

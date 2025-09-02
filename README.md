@@ -8,7 +8,7 @@ A comprehensive MCP (Model Context Protocol) server that provides full SeaTable 
 
 ```
 command: npx
-args: ["@aspereo/mcp-seatable"]
+args: ["-y", "@aspereo/mcp-seatable"]
 ```
 
 2. Set your environment variables:
@@ -16,7 +16,9 @@ args: ["@aspereo/mcp-seatable"]
    - `SEATABLE_API_TOKEN`: Your SeaTable API token
    - `SEATABLE_BASE_UUID`: Your SeaTable base UUID
 
-3. Restart your MCP client and start using SeaTable tools!## What is this?
+3. Restart your MCP client and start using SeaTable tools!
+
+## What is this?
 
 This project implements a production-ready MCP server using the `@modelcontextprotocol/sdk` that integrates with SeaTable's REST API. It provides a complete toolkit for database operations including CRUD operations, advanced querying, schema management, and raw SQL execution. All tools use Zod validation and return structured JSON responses.
 
@@ -42,7 +44,7 @@ Built with a modern, proven architecture pattern:
 
 ## Installation
 
-No installation required! This MCP server can be used directly with `npx @aspereo/mcp-seatable`.
+No installation required! This MCP server can be used directly with `npx -y @aspereo/mcp-seatable`.
 
 Alternatively, you can install globally:
 
@@ -64,7 +66,7 @@ On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
   "mcpServers": {
     "seatable": {
       "command": "npx",
-      "args": ["@aspereo/mcp-seatable"],
+      "args": ["-y", "@aspereo/mcp-seatable"],
       "env": {
         "SEATABLE_SERVER_URL": "https://your-seatable-server.com",
         "SEATABLE_API_TOKEN": "your-api-token",
@@ -84,7 +86,7 @@ Add to your Cursor settings by opening the command palette (`Cmd/Ctrl+Shift+P`) 
   "mcp.servers": {
     "seatable": {
       "command": "npx",
-      "args": ["@aspereo/mcp-seatable"],
+      "args": ["-y", "@aspereo/mcp-seatable"],
       "env": {
         "SEATABLE_SERVER_URL": "https://your-seatable-server.com",
         "SEATABLE_API_TOKEN": "your-api-token",
@@ -104,7 +106,7 @@ Install the MCP extension for VSCode, then add to your VSCode settings.json:
   "mcp.servers": {
     "seatable": {
       "command": "npx",
-      "args": ["@aspereo/mcp-seatable"],
+      "args": ["-y", "@aspereo/mcp-seatable"],
       "env": {
         "SEATABLE_SERVER_URL": "https://your-seatable-server.com",
         "SEATABLE_API_TOKEN": "your-api-token",
@@ -125,7 +127,9 @@ All configuration is done through environment variables:
 - `SEATABLE_TABLE_NAME` - Optional default table name
 - `SEATABLE_MOCK` - Set to `true` for offline testing with mock data
 - `SEATABLE_ACCESS_TOKEN_EXP` - Token expiry (default: `1h`)
-- `SEATABLE_TOKEN_ENDPOINT_PATH` - Custom token endpoint path if needed## Programmatic Usage
+- `SEATABLE_TOKEN_ENDPOINT_PATH` - Custom token endpoint path if needed
+
+## Programmatic Usage
 
 You can also use mcp-seatable as a library in your Node.js applications:
 
@@ -155,6 +159,64 @@ SEATABLE_MOCK=true npm run dev
 ```
 
 The mock implements in-memory tables and rows and returns synthetic metadata. Useful for demos and tests without a live SeaTable.
+
+## Version Pinning (recommended)
+
+To avoid unexpected changes when new versions are released, pin the package version in your MCP client configuration. Replace `1.0.2` with the version you want to lock to.
+
+### Claude Desktop
+
+```json
+{
+  "mcpServers": {
+    "seatable": {
+      "command": "npx",
+      "args": ["-y", "@aspereo/mcp-seatable@1.0.2"],
+      "env": {
+        "SEATABLE_SERVER_URL": "https://your-seatable-server.com",
+        "SEATABLE_API_TOKEN": "your-api-token",
+        "SEATABLE_BASE_UUID": "your-base-uuid"
+      }
+    }
+  }
+}
+```
+
+### Cursor
+
+```json
+{
+  "mcp.servers": {
+    "seatable": {
+      "command": "npx",
+      "args": ["-y", "@aspereo/mcp-seatable@1.0.2"],
+      "env": {
+        "SEATABLE_SERVER_URL": "https://your-seatable-server.com",
+        "SEATABLE_API_TOKEN": "your-api-token",
+        "SEATABLE_BASE_UUID": "your-base-uuid"
+      }
+    }
+  }
+}
+```
+
+### VSCode with GitHub Copilot
+
+```json
+{
+  "mcp.servers": {
+    "seatable": {
+      "command": "npx",
+      "args": ["-y", "@aspereo/mcp-seatable@1.0.2"],
+      "env": {
+        "SEATABLE_SERVER_URL": "https://your-seatable-server.com",
+        "SEATABLE_API_TOKEN": "your-api-token",
+        "SEATABLE_BASE_UUID": "your-base-uuid"
+      }
+    }
+  }
+}
+```
 
 ## MCP Tools
 

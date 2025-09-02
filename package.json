@@ -1,6 +1,6 @@
 {
   "name": "@aspereo/mcp-seatable",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "type": "module",
   "license": "MIT",
   "description": "A comprehensive MCP (Model Context Protocol) server that provides full SeaTable database access through 11 powerful tools",
