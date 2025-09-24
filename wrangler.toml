@@ -1,0 +1,10 @@
+name = "mcp-seatable"
+main = "dist/cloudflare/worker.js"
+compatibility_date = "2024-12-01"
+workers_dev = true
+
+[vars]
+# Define required environment variables when deploying via Wrangler
+# SEATABLE_SERVER_URL = "https://your-seatable-server"
+# SEATABLE_API_TOKEN = "your-api-token"
+# SEATABLE_BASE_UUID = "your-base-uuid"

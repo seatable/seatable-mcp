@@ -160,6 +160,36 @@ SEATABLE_MOCK=true npm run dev
 
 The mock implements in-memory tables and rows and returns synthetic metadata. Useful for demos and tests without a live SeaTable.
 
+## HTTP/SSE Endpoint
+
+The MCP server now includes an optional HTTP transport compatible with the deprecated SSE protocol. This is useful when you need to expose the server over the network instead of stdio.
+
+### Local SSE Server
+
+Launch the SSE transport by setting the transport mode or passing `--sse` to the CLI:
+
+```bash
+MCP_SEATABLE_TRANSPORT=sse npx -y @aspereo/mcp-seatable
+# or
+npx -y @aspereo/mcp-seatable --sse
+```
+
+The server listens on `PORT` (default `3000`) and exposes:
+
+- `GET /mcp` – establishes the SSE stream and returns the message endpoint
+- `POST /messages?sessionId=...` – accepts JSON-RPC requests
+- `GET /health` – simple health probe
+
+### Cloudflare Worker Quick Launch
+
+A dedicated Worker entry point is available for Cloudflare deployments. Use the included npm script to run it locally with Wrangler:
+
+```bash
+npm run cf:dev
+```
+
+Configure your environment variables through Wrangler (or by editing `wrangler.toml`) before starting the worker. The worker exposes the same `/mcp`, `/messages`, and `/health` endpoints backed by the MCP toolset.
+
 ## Version Pinning (recommended)
 
 To avoid unexpected changes when new versions are released, pin the package version in your MCP client configuration. Replace `1.0.2` with the version you want to lock to.
