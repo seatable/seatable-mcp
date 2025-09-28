@@ -98,8 +98,8 @@ Add to `claude_desktop_config.json`:
 ### For Web Applications (Cloudflare Worker)
 
 ```javascript
-// Connect to the live Worker instance
-const mcpClient = new MCPClient('https://mcp-seatable.brian-money.workers.dev/mcp')
+// Connect to your deployed Worker instance
+const mcpClient = new MCPClient('https://your-worker-name.your-account.workers.dev/mcp')
 await mcpClient.initialize()
 const tables = await mcpClient.callTool('list_tables', {})
 ```
