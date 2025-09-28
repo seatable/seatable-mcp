@@ -1,0 +1,26 @@
+name = "mcp-seatable"
+main = "src/cloudflare/worker.ts"
+tsconfig = "tsconfig.cloudflare.json"
+compatibility_date = "2024-12-01"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+[observability]
+enabled = true
+
+[observability.logs]
+invocation_logs = true
+head_sampling_rate = 1
+
+[[analytics_engine_datasets]]
+binding = "LOGS"
+dataset = "mcp-seatable-logs"
+
+[durable_objects]
+bindings = [{ name = "SEATABLE_MCP", class_name = "SeaTableMCPAgent" }]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SeaTableMCPAgent"]
+
+# (Secrets removed; set via `wrangler secret put` for each environment)
