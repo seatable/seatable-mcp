@@ -1,14 +1,17 @@
 {
-  // mcpServers: for clients like Claude Desktop / Claude for VS Code
-  "servers": {
-    "seatable": {
-      "command": "bash",
-      "args": [
-        "-lc",
-        "set -a; [ -f .env ] && . .env; set +a; npm run -s build && node ./bin/seatable-mcp"
-      ],
-      "cwd": "${workspaceFolder}",
-      "transport": "stdio"
-    }
-  }
+	"servers": {
+		"seatable-sse": {
+			"url": "https://mcp-seatable.brian-money.workers.dev/sse",
+			"type": "http"
+		},
+		"cf-workers": {
+			"url": "https://bindings.mcp.cloudflare.com/sse",
+			"type": "http"
+		},
+		"cf-observability": {
+			"url": "https://observability.mcp.cloudflare.com/sse",
+			"type": "http"
+		}
+	},
+	"inputs": []
 }

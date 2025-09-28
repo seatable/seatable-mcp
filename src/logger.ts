@@ -2,15 +2,16 @@ import type { Logger } from 'pino'
 
 let logger: Logger
 
-if (typeof process !== 'undefined' && process.versions?.node) {
+if (typeof process !== 'undefined' && process.versions?.node && !('WebSocketPair' in globalThis)) {
+    // Node.js environment: use pino without destination (v9 removed destination())
     const pinoModule = await import('pino')
-    const destination = pinoModule.destination({ fd: 2 })
-    logger = pinoModule.default({
+    const pino: any = pinoModule.default
+    logger = pino({
         level: process.env.LOG_LEVEL || 'info',
         base: undefined,
         redact: ['req.headers.authorization', 'config.headers.Authorization'],
-        timestamp: pinoModule.default.stdTimeFunctions.isoTime,
-    }, destination)
+        timestamp: pino?.stdTimeFunctions?.isoTime,
+    }) as Logger
 } else {
     const createFallbackLogger = () => {
         const base: any = {

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP-SeaTable Worker Status</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; padding: 20px; max-width: 800px; margin: auto; background: #f9f9f9; color: #333; }
+        h1, h2 { color: #111; }
+        pre { background: #eee; padding: 10px; border-radius: 5px; white-space: pre-wrap; word-wrap: break-word; }
+        #status { font-weight: bold; }
+        .error { color: #d8000c; background: #ffbaba; padding: 10px; border-radius: 5px; }
+        .success { color: #270; background: #dff2bf; padding: 10px; border-radius: 5px; }
+        button { font-size: 1rem; padding: 8px 15px; border-radius: 5px; border: 1px solid #ccc; cursor: pointer; }
+        button:hover { background: #e0e0e0; }
+    </style>
+</head>
+<body>
+    <h1>MCP-SeaTable Worker Status</h1>
+    <p>This page is a diagnostic tool to test the Server-Sent Events (SSE) connection to the MCP worker.</p>
+    
+    <h2>1. SSE Connection</h2>
+    <p>Status: <span id="status">Connecting...</span></p>
+    <pre id="events">Connecting to /mcp...</pre>
+
+    <h2>2. Messages Endpoint</h2>
+    <p>The URL for sending POST requests will appear here once received from the 'endpoint' event.</p>
+    <pre id="endpoint">Waiting for endpoint event...</pre>
+
+    <h2>3. Test Message</h2>
+    <p>Once the endpoint is received, you can send a test 'ping' message.</p>
+    <button id="pingButton" disabled>Send Ping</button>
+    <pre id="response">Ping response will appear here.</pre>
+
+    <script>
+        const statusEl = document.getElementById('status');
+        const eventsEl = document.getElementById('events');
+        const endpointEl = document.getElementById('endpoint');
+        const pingButton = document.getElementById('pingButton');
+        const responseEl = document.getElementById('response');
+
+        let messagesUrl = '';
+
+        function logEvent(text) {
+            eventsEl.textContent += `\n${text}`;
+        }
+
+        const ssePath = '/mcp';
+        const eventSource = new EventSource(ssePath);
+
+        eventSource.onopen = () => {
+            statusEl.textContent = 'Connected';
+            statusEl.className = 'success';
+            logEvent('Connection opened.');
+        };
+
+        eventSource.onerror = (err) => {
+            statusEl.textContent = 'Error';
+            statusEl.className = 'error';
+            logEvent(`Error: ${JSON.stringify(err, null, 2)}`);
+            console.error('EventSource failed:', err);
+        };
+
+        eventSource.addEventListener('endpoint', (e) => {
+            logEvent(`Received 'endpoint' event:\n  data: ${e.data}`);
+            messagesUrl = e.data;
+            endpointEl.textContent = messagesUrl;
+            pingButton.disabled = false;
+        });
+
+        eventSource.addEventListener('message', (e) => {
+            logEvent(`Received 'message' event:\n  data: ${e.data}`);
+            responseEl.textContent = JSON.stringify(JSON.parse(e.data), null, 2);
+        });
+
+        pingButton.addEventListener('click', async () => {
+            if (!messagesUrl) {
+                alert('Messages URL not yet received.');
+                return;
+            }
+            responseEl.textContent = 'Sending ping...';
+            try {
+                const res = await fetch(messagesUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        jsonrpc: '2.0',
+                        id: 'diag-1',
+                        method: 'ping_seatable',
+                        params: {}
+                    })
+                });
+                if (!res.ok) {
+                    throw new Error(`HTTP error! status: ${res.status}`);
+                }
+                responseEl.textContent = 'Ping sent successfully (HTTP 202 Accepted). Waiting for response via SSE...';
+            } catch (err) {
+                responseEl.textContent = `Error sending ping: ${err.message}`;
+                console.error('Ping failed:', err);
+            }
+        });
+    </script>
+</body>
+</html>

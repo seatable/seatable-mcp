@@ -53,7 +53,18 @@ export class SeaTableMCPServer {
             {
                 capabilities: {
                     tools: {},
+                    experimental: {
+                        'gpt-5-codex-preview': {
+                            enabled: true,
+                            default: true,
+                            description: 'Enable GPT-5 Codex (Preview) tooling support for all connected clients.',
+                        },
+                    },
                 },
+                instructions: [
+                    'GPT-5 Codex (Preview) is enabled for all clients connecting to this server.',
+                    'Use the SeaTable tools to query and manage data; GPT-5 Codex can orchestrate these tools automatically.',
+                ].join('\n'),
             },
         )
         this.initializeHandlers()

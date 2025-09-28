@@ -1,22 +1,169 @@
 # mcp-seatable
 
-A comprehensive MCP (Model Context Protocol) server that provides full SeaTable database access through 11 powerful tools.
+A comprehensive MCP (Model Context Protocol) server that provides full SeaTable database access through 18+ powerful tools. Deploy anywhere: traditional CLI, local SSE server, or scalable Cloudflare Workers.
 
-## Quick Start
+## 🚀 Deployment Options
 
-1. Configure your MCP client (Claude, Cursor, or VSCode) to use:
+### Option 1: Cloudflare Workers (Recommended for Production)
 
+**Live Demo**: `https://mcp-seatable.brian-money.workers.dev`
+
+Deploy your own scalable MCP server on Cloudflare Workers with session persistence and dual transport support:
+
+```bash
+# Clone and deploy
+git clone https://github.com/brianmoney/mcp-seatable
+cd mcp-seatable
+npm install
+npx wrangler deploy
+
+# Or use the live instance directly
+npx mcp-remote https://mcp-seatable.brian-money.workers.dev/sse
 ```
-command: npx
-args: ["-y", "@aspereo/mcp-seatable"]
+
+**Features:**
+
+- ✅ Persistent sessions with Durable Objects
+- ✅ Both SSE (`/sse`) and Streamable HTTP (`/mcp`) transports
+- ✅ Automatic scaling and global distribution
+- ✅ Zero cold start issues
+- ✅ Built-in health monitoring
+
+### Option 2: Local SSE Server (Best for Development)
+
+Run a local HTTP server with SSE transport for network-accessible MCP:
+
+```bash
+# Install and run locally
+npm install -g @aspereo/mcp-seatable
+PORT=3001 MCP_SEATABLE_TRANSPORT=sse mcp-seatable
+
+# Or with npx
+PORT=3001 npx -y @aspereo/mcp-seatable --sse
+
+# Test endpoints
+curl http://localhost:3001/health
+curl -H "Accept: text/event-stream" http://localhost:3001/mcp
 ```
 
-2. Set your environment variables:
-   - `SEATABLE_SERVER_URL`: Your SeaTable server URL
-   - `SEATABLE_API_TOKEN`: Your SeaTable API token
-   - `SEATABLE_BASE_UUID`: Your SeaTable base UUID
+**Features:**
 
-3. Restart your MCP client and start using SeaTable tools!
+- ✅ Network accessible over HTTP
+- ✅ Real-time SSE communication
+- ✅ Perfect for development and testing
+- ✅ MCP Inspector compatible
+
+### Option 3: Traditional CLI (MCP Clients)
+
+Direct integration with MCP clients like Claude Desktop, Cursor, and VS Code:
+
+```json
+{
+  "mcpServers": {
+    "seatable": {
+      "command": "npx",
+      "args": ["-y", "@aspereo/mcp-seatable"],
+      "env": {
+        "SEATABLE_SERVER_URL": "https://your-seatable-server.com",
+        "SEATABLE_API_TOKEN": "your-api-token",
+        "SEATABLE_BASE_UUID": "your-base-uuid"
+      }
+    }
+  }
+}
+```
+
+## ⚡ Quick Start Examples
+
+### For Claude Desktop (Traditional CLI)
+
+Add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "seatable": {
+      "command": "npx",
+      "args": ["-y", "@aspereo/mcp-seatable@1.0.2"],
+      "env": {
+        "SEATABLE_SERVER_URL": "https://cloud.seatable.io",
+        "SEATABLE_API_TOKEN": "your-api-token",
+        "SEATABLE_BASE_UUID": "your-base-uuid"
+      }
+    }
+  }
+}
+```
+
+### For Web Applications (Cloudflare Worker)
+
+```javascript
+// Connect to the live Worker instance
+const mcpClient = new MCPClient('https://mcp-seatable.brian-money.workers.dev/mcp')
+await mcpClient.initialize()
+const tables = await mcpClient.callTool('list_tables', {})
+```
+
+### For Development (Local SSE Server)
+
+```bash
+# Terminal 1: Start server
+PORT=3001 npx -y @aspereo/mcp-seatable --sse
+
+# Terminal 2: Test with MCP Inspector
+npx @modelcontextprotocol/inspector@latest
+# Connect to: http://localhost:3001/mcp
+```
+
+### Required Environment Variables
+
+All deployment methods need these environment variables:
+
+- `SEATABLE_SERVER_URL` - Your SeaTable server (e.g., `https://cloud.seatable.io`)
+- `SEATABLE_API_TOKEN` - Your SeaTable API token
+- `SEATABLE_BASE_UUID` - Your SeaTable base UUID
+
+Optional:
+
+- `SEATABLE_TABLE_NAME` - Default table name
+- `SEATABLE_MOCK=true` - Enable mock mode for testing
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+| Issue                    | Solution                                       |
+| ------------------------ | ---------------------------------------------- |
+| `command not found: npx` | Install Node.js 18+                            |
+| `Invalid API token`      | Check `SEATABLE_API_TOKEN` in environment      |
+| `Base not found`         | Verify `SEATABLE_BASE_UUID` is correct         |
+| `Connection timeout`     | Check `SEATABLE_SERVER_URL` and network access |
+| `Permission denied`      | Ensure API token has required base permissions |
+
+### Testing Your Setup
+
+```bash
+# Test basic connectivity
+node scripts/test-client.mjs
+
+# Test specific tool
+node scripts/mcp-call.cjs list_tables
+
+# Test with mock data
+SEATABLE_MOCK=true node scripts/test-client.mjs
+```
+
+### Debug Mode
+
+Enable verbose logging:
+
+```bash
+# For CLI mode
+DEBUG=mcp-seatable:* npx -y @aspereo/mcp-seatable
+
+# For SSE mode
+DEBUG=mcp-seatable:* PORT=3001 npx -y @aspereo/mcp-seatable --sse
+```
 
 ## What is this?
 
@@ -160,35 +307,71 @@ SEATABLE_MOCK=true npm run dev
 
 The mock implements in-memory tables and rows and returns synthetic metadata. Useful for demos and tests without a live SeaTable.
 
-## HTTP/SSE Endpoint
+## 🏗️ Architecture & Transport Details
 
-The MCP server now includes an optional HTTP transport compatible with the deprecated SSE protocol. This is useful when you need to expose the server over the network instead of stdio.
+### Deployment Architecture Comparison
 
-### Local SSE Server
+| Feature                | **Cloudflare Worker**              | **Local SSE Server**        | **Traditional CLI**           |
+| ---------------------- | ---------------------------------- | --------------------------- | ----------------------------- |
+| **Scalability**        | ✅ Auto-scaling, global            | 📍 Single instance          | 📍 Per-client process         |
+| **Session Management** | ✅ Durable Objects (persistent)    | ⚠️ In-memory (may timeout)  | ✅ Direct stdio               |
+| **Network Access**     | ✅ HTTPS endpoints                 | ✅ HTTP endpoints           | ❌ Local only                 |
+| **Cold Starts**        | ✅ Eliminated with Durable Objects | ✅ Always warm              | ❌ Process startup            |
+| **Transport Support**  | ✅ Both SSE + Streamable HTTP      | ✅ SSE only                 | ✅ stdio only                 |
+| **Use Cases**          | Production, multi-user, web apps   | Development, testing, demos | IDE integration, personal use |
 
-Launch the SSE transport by setting the transport mode or passing `--sse` to the CLI:
+### Transport Protocol Details
 
-```bash
-MCP_SEATABLE_TRANSPORT=sse npx -y @aspereo/mcp-seatable
-# or
-npx -y @aspereo/mcp-seatable --sse
-```
+#### Cloudflare Worker Endpoints
 
-The server listens on `PORT` (default `3000`) and exposes:
-
-- `GET /mcp` – establishes the SSE stream and returns the message endpoint
-- `POST /messages?sessionId=...` – accepts JSON-RPC requests
-- `GET /health` – simple health probe
-
-### Cloudflare Worker Quick Launch
-
-A dedicated Worker entry point is available for Cloudflare deployments. Use the included npm script to run it locally with Wrangler:
+**SSE Transport** (Recommended for compatibility):
 
 ```bash
-npm run cf:dev
+# Connection flow
+GET /sse                              # Establish SSE connection
+POST /sse/message?sessionId=xxx      # Send MCP messages
 ```
 
-Configure your environment variables through Wrangler (or by editing `wrangler.toml`) before starting the worker. The worker exposes the same `/mcp`, `/messages`, and `/health` endpoints backed by the MCP toolset.
+**Streamable HTTP Transport** (Modern, single-endpoint):
+
+```bash
+# All communication through one endpoint
+POST /mcp                            # Initialize + all subsequent messages
+# Session managed via Mcp-Session-Id headers
+```
+
+#### Local SSE Server Endpoints
+
+```bash
+GET /mcp                             # SSE connection (different path!)
+POST /messages?sessionId=xxx         # Message handling
+GET /health                          # Health probe
+```
+
+#### Traditional CLI (stdio)
+
+```bash
+# Direct stdin/stdout communication
+node dist/index.js                   # Starts MCP server on stdio
+./bin/seatable-mcp.cjs              # Binary wrapper
+```
+
+### Development & Deployment Commands
+
+```bash
+# Local development
+npm run dev                          # TypeScript watch mode
+PORT=3001 npm start -- --sse        # Local SSE server
+npm run cf:dev                       # Local Worker with Wrangler
+
+# Deployment
+npx wrangler deploy                  # Deploy to Cloudflare Workers
+npm run cf:secrets:sync             # Sync environment to Worker
+
+# Testing
+./scripts/test-worker.sh             # Test deployed Worker
+node scripts/test-client.mjs        # Interactive testing
+```
 
 ## Version Pinning (recommended)
 
@@ -248,36 +431,38 @@ To avoid unexpected changes when new versions are released, pin the package vers
 }
 ```
 
-## MCP Tools
+## 🛠️ MCP Tools
 
-Our server provides 11 comprehensive tools for complete SeaTable database management:
+Our server provides 18+ comprehensive tools for complete SeaTable database management:
 
 ### Core Data Operations
 
-- **`list_tables`** - Get all tables with metadata
-- **`list_rows`** - Paginated row listing with filtering and sorting
-- **`get_row`** - Retrieve specific row by ID
-- **`append_rows`** - Add new rows (supports bulk operations)
-- **`update_rows`** - Modify existing rows (supports bulk operations)
-- **`delete_rows`** - Remove rows by ID (supports bulk operations)
-
-### Advanced Querying
-
-- **`find_rows`** - Client-side filtering with powerful DSL (supports and/or/not, eq, ne, in, gt/gte/lt/lte, contains, starts_with, ends_with, is_null)
-- **`query_sql`** - Execute raw SQL queries (SELECT, INSERT, UPDATE, DELETE) with parameterization
-  - Supports complex JOINs, aggregations, and advanced SQL features
-  - Safe parameterized queries prevent SQL injection
-  - Returns rich metadata including column schemas and types
-  - Maximum 10,000 rows per query (default 100 if no LIMIT specified)
-
-### Schema Management
-
-- **`get_schema`** - Get complete database structure and metadata
-- **`manage_tables`** - Create, rename, and delete tables
-
-### System Operations
-
 - **`ping_seatable`** - Health check with connection status and latency monitoring
+- **`list_tables`** - Get all tables with metadata
+- **`get_schema`** - Get complete database structure and metadata
+- **`list_rows`** - Paginated row listing with filtering and sorting
+- **`find_rows`** - Advanced client-side filtering with powerful DSL
+- **`search_rows`** - Full-text search across table data
+- **`get_row`** - Retrieve specific row by ID
+- **`add_row`** - Add single new row
+- **`append_rows`** - Add multiple rows (bulk operations)
+- **`update_row`** - Update single row
+- **`upsert_rows`** - Insert or update rows (bulk operations)
+- **`delete_row`** - Remove single row by ID
+- **`link_rows`** - Create relationships between rows
+- **`unlink_rows`** - Remove relationships between rows
+
+### Table & Schema Management
+
+- **`manage_tables`** - Create, rename, and delete tables
+- **`manage_columns`** - Add, modify, and delete table columns
+- **`bulk_set_select_options`** - Bulk manage dropdown/multi-select options
+
+### File Operations
+
+- **`attach_file_to_row`** - Upload and attach files to table rows
+
+All tools support comprehensive input validation with Zod schemas, structured JSON responses, and detailed error handling.
 
 All tools include comprehensive input validation with Zod schemas and return structured JSON responses.
 
@@ -335,24 +520,60 @@ All tools include comprehensive input validation with Zod schemas and return str
 { "tool": "ping_seatable", "args": {} }
 ```
 
-## Testing Tools
+## 🧪 Testing & Development
 
-You can test individual tools using the included test script:
+### Testing Individual Tools
+
+Test specific MCP tools using the included test script:
 
 ```bash
 # Test basic operations
+node scripts/mcp-call.cjs ping_seatable '{}'
 node scripts/mcp-call.cjs list_tables '{}'
 node scripts/mcp-call.cjs list_rows '{"table": "Tasks", "page_size": 5}'
-node scripts/mcp-call.cjs ping_seatable '{}'
 
-# Test advanced queries
-node scripts/mcp-call.cjs find_rows '{"table": "Tasks", "filter": {"Status": "Todo"}}'
-node scripts/mcp-call.cjs query_sql '{"sql": "SELECT * FROM Tasks LIMIT 3"}'
+# Test data operations
+node scripts/mcp-call.cjs add_row '{"table": "Tasks", "row": {"Title": "Test Task"}}'
+node scripts/mcp-call.cjs find_rows '{"table": "Tasks", "filter": {"Status": {"eq": "Todo"}}}'
+node scripts/mcp-call.cjs search_rows '{"table": "Tasks", "query": "urgent"}'
 
 # Test schema operations
 node scripts/mcp-call.cjs get_schema '{}'
 node scripts/mcp-call.cjs manage_tables '{"operation": "create", "table_name": "TestTable"}'
 ```
+
+### Cloudflare Worker Testing
+
+Comprehensive test suite for Worker deployment:
+
+```bash
+# Run full automated test suite
+./scripts/test-worker.sh
+
+# Interactive testing with step-by-step validation
+./scripts/test-worker.sh --interactive
+
+# Interactive MCP client for live Worker testing
+node scripts/test-client.mjs
+```
+
+### Development Environment Setup
+
+Set up complete development environment with VS Code configs and MCP Inspector:
+
+```bash
+# Install MCP Inspector, mcp-remote, and create dev configs
+./scripts/setup-test-env.sh
+```
+
+### Available Scripts
+
+- `scripts/mcp-call.cjs` - Test individual MCP tools directly
+- `scripts/test-worker.sh` - Comprehensive Worker testing suite
+- `scripts/test-client.mjs` - Interactive MCP client for live testing
+- `scripts/setup-test-env.sh` - Complete development environment setup
+- `scripts/sync-wrangler-secrets.ts` - Sync environment variables to Worker secrets
+- `scripts/probe-token.ts` - SeaTable API token validation utility
 
 ## Troubleshooting
 
