@@ -1,12 +1,12 @@
 # mcp-seatable
 
-A comprehensive MCP (Model Context Protocol) server that provides full SeaTable database access through 18+ powerful tools. Deploy anywhere: traditional CLI, local SSE server, or scalable Cloudflare Workers.
+A comprehensive MCP (Model Context Protocol) server that provides full SeaTable dat```javascript
+// Connect to your deployed Worker instance
+const mcpClient = new MCPClient('https://your-worker-name.your-account.workers.dev/mcp');se access through 18+ powerful tools. Deploy anywhere: traditional CLI, local SSE server, or scalable Cloudflare Workers.
 
 ## 🚀 Deployment Options
 
 ### Option 1: Cloudflare Workers (Recommended for Production)
-
-**Live Demo**: `https://mcp-seatable.brian-money.workers.dev`
 
 Deploy your own scalable MCP server on Cloudflare Workers with session persistence and dual transport support:
 
@@ -17,8 +17,8 @@ cd mcp-seatable
 npm install
 npx wrangler deploy
 
-# Or use the live instance directly
-npx mcp-remote https://mcp-seatable.brian-money.workers.dev/sse
+# After deployment, use your worker URL
+npx mcp-remote https://your-worker-name.your-account.workers.dev/sse
 ```
 
 **Features:**
