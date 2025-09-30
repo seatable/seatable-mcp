@@ -4,6 +4,8 @@ A comprehensive MCP (Model Context Protocol) server that provides full SeaTable 
 // Connect to your deployed Worker instance
 const mcpClient = new MCPClient('https://your-worker-name.your-account.workers.dev/mcp');se access through 18+ powerful tools. Deploy anywhere: traditional CLI, local SSE server, or scalable Cloudflare Workers.
 
+> NOTE: As of v1.0.3 the Cloudflare Worker deployment exposes all tools without authentication. Do NOT deploy to a public URL containing sensitive data until OAuth + scoped permissions (planned) are enabled. You can mitigate risk by keeping the Worker URL private or restricting via Cloudflare Access.
+
 ## 🚀 Deployment Options
 
 ### Option 1: Cloudflare Workers (Recommended for Production)
@@ -84,7 +86,7 @@ Add to `claude_desktop_config.json`:
   "mcpServers": {
     "seatable": {
       "command": "npx",
-      "args": ["-y", "@aspereo/mcp-seatable@1.0.2"],
+      "args": ["-y", "@aspereo/mcp-seatable@1.0.3"],
       "env": {
         "SEATABLE_SERVER_URL": "https://cloud.seatable.io",
         "SEATABLE_API_TOKEN": "your-api-token",
@@ -384,7 +386,7 @@ To avoid unexpected changes when new versions are released, pin the package vers
   "mcpServers": {
     "seatable": {
       "command": "npx",
-      "args": ["-y", "@aspereo/mcp-seatable@1.0.2"],
+      "args": ["-y", "@aspereo/mcp-seatable@1.0.3"],
       "env": {
         "SEATABLE_SERVER_URL": "https://your-seatable-server.com",
         "SEATABLE_API_TOKEN": "your-api-token",
@@ -402,7 +404,7 @@ To avoid unexpected changes when new versions are released, pin the package vers
   "mcp.servers": {
     "seatable": {
       "command": "npx",
-      "args": ["-y", "@aspereo/mcp-seatable@1.0.2"],
+      "args": ["-y", "@aspereo/mcp-seatable@1.0.3"],
       "env": {
         "SEATABLE_SERVER_URL": "https://your-seatable-server.com",
         "SEATABLE_API_TOKEN": "your-api-token",
@@ -420,7 +422,7 @@ To avoid unexpected changes when new versions are released, pin the package vers
   "mcp.servers": {
     "seatable": {
       "command": "npx",
-      "args": ["-y", "@aspereo/mcp-seatable@1.0.2"],
+      "args": ["-y", "@aspereo/mcp-seatable@1.0.3"],
       "env": {
         "SEATABLE_SERVER_URL": "https://your-seatable-server.com",
         "SEATABLE_API_TOKEN": "your-api-token",

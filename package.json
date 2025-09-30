@@ -1,6 +1,6 @@
 {
   "name": "@aspereo/mcp-seatable",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
   "license": "MIT",
   "description": "A comprehensive MCP (Model Context Protocol) server that provides full SeaTable database access through 11 powerful tools",
@@ -62,7 +62,9 @@
     "prepare": "npm run build",
     "cf:dev": "wrangler dev src/cloudflare/worker.ts --local",
     "cf:secrets:sync": "tsx scripts/sync-wrangler-secrets.ts",
-    "cf:secrets:sync:prod": "tsx scripts/sync-wrangler-secrets.ts --env production"
+    "cf:secrets:sync:prod": "tsx scripts/sync-wrangler-secrets.ts --env production",
+    "schemas:snapshot": "tsx scripts/snapshot-schemas.ts",
+    "parity:test": "tsx scripts/transport-parity.ts"
   },
   "engines": {
     "node": ">=18"

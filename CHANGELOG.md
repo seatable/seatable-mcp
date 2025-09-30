@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2025-09-29
+
+### Changed
+
+- Migrated remaining adapter-based tools (`append_rows`, `upsert_rows`, `delete_rows`, `link_rows`, `unlink_rows`, `attach_file_to_row`, `bulk_set_select_options`) to explicit Zod schema registrations directly in the Cloudflare Worker MCP agent.
+- Removed dual-registration ambiguity: each tool now has a single authoritative schema (prevents host-side caching of stale permissive schemas and ensures arguments are transmitted correctly).
+
+### Added
+
+- Explicit handlers now return structured JSON payloads consistently across all batch & link operations.
+- File attachment tool exposes explicit discriminated union (`url` | `bytes_base64`) with size guard (<= 5 MB) and structured error (`ERR_FILE_TOO_LARGE`).
+- Bulk select options tool now returns updated table schema snapshot alongside per-column results.
+
+### Fixed
+
+- Eliminated potential silent argument stripping caused by permissive/empty derived schemas in adapter layer.
+
+### Notes
+
+- Diagnostic tools (`add_row_explicit`, `args_probe`) intentionally retained for short-term transport verification; will be gated or removed prior to production security hardening.
+- Future hardening planned: enforce column existence & unknown column policy within `append_rows` when `allow_create_columns` is false, and narrow `row` value typing where practical.
+
 ## [1.0.0] - 2025-08-30
 
 ### Added

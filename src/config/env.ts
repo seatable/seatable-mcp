@@ -30,6 +30,12 @@ const EnvSchema = z.object({
         .optional()
         .transform((v) => (v === '1' || v === 'true' ? true : false))
         .optional(),
+    // Debug / experimental tools (e.g. echo_args). Should NEVER be enabled in production unless explicitly needed.
+    SEATABLE_ENABLE_DEBUG_TOOLS: z
+        .string()
+        .optional()
+        .transform((v) => (v === '1' || v === 'true' ? true : false))
+        .optional(),
 })
 
 export type Env = z.infer<typeof EnvSchema>
