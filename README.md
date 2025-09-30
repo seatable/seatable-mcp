@@ -1,8 +1,12 @@
 # mcp-seatable
 
-A comprehensive MCP (Model Context Protocol) server that provides full SeaTable dat```javascript
-// Connect to your deployed Worker instance
-const mcpClient = new MCPClient('https://your-worker-name.your-account.workers.dev/mcp');se access through 18+ powerful tools. Deploy anywhere: traditional CLI, local SSE server, or scalable Cloudflare Workers.
+A comprehensive Model Context Protocol (MCP) server for SeaTable that exposes end‑to‑end database capabilities (schema introspection, CRUD, querying, linking, select option management, and file attachment stubs) through 18+ rigorously defined tools. You can run it:
+
+- As a local CLI (stdio) MCP server
+- As an HTTP SSE server for local or remote IDEs
+- As a globally distributed Cloudflare Worker (dual transport: `/sse` + `/mcp`)
+
+Version 1.0.3 introduces fully explicit Zod schemas for every tool in the Cloudflare Worker path, eliminating earlier adapter ambiguity and ensuring reliable argument delivery across hosts.
 
 > NOTE: As of v1.0.3 the Cloudflare Worker deployment exposes all tools without authentication. Do NOT deploy to a public URL containing sensitive data until OAuth + scoped permissions (planned) are enabled. You can mitigate risk by keeping the Worker URL private or restricting via Cloudflare Access.
 
