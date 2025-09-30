@@ -9,7 +9,7 @@ const InputSchema = z.object({
 
 export const registerSearchRows: ToolRegistrar = (server, { client, getInputSchema }) => {
     server.registerTool(
-        'searchRows',
+        'search_rows',
         {
             title: 'Search Rows',
             description: 'Search rows with a filter object',

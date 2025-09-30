@@ -17,7 +17,10 @@ import { MockSeaTableClient } from '../seatable/mockClient.js'
 
 // Helper function to convert Zod schemas to JSON Schema for MCP tools
 const getInputSchema = (schema: z.ZodType<object>): ListToolsResult['tools'][0]['inputSchema'] => {
-    const jsonSchema = zodToJsonSchema(schema)
+    const jsonSchema = zodToJsonSchema(schema, {
+        target: 'jsonSchema7',
+        strictUnions: true
+    })
     
     if (!('type' in jsonSchema) || jsonSchema.type !== 'object') {
         throw new Error(`Invalid input schema: expected an object but got ${
@@ -25,7 +28,12 @@ const getInputSchema = (schema: z.ZodType<object>): ListToolsResult['tools'][0][
         }`)
     }
     
-    return { ...jsonSchema, type: 'object' }
+    // Allow additional properties to prevent validation errors in MCP clients
+    return { 
+        ...jsonSchema, 
+        type: 'object',
+        additionalProperties: true 
+    }
 }
 
 const formatToolResponse = (data: unknown, isError = false): CallToolResult => {

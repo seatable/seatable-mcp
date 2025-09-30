@@ -1,0 +1,817 @@
+{
+  "generated_at": "2025-09-28T20:26:29.107Z",
+  "tools": [
+    {
+      "name": "add_row",
+      "description": "Add a new row to a table",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "type": "object",
+        "description": "Add a single row to a table",
+        "properties": {
+          "table": {
+            "type": "string",
+            "description": "Target table name"
+          },
+          "row": {
+            "type": "object",
+            "description": "Row object (column -> value)",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "table",
+          "row"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "append_rows",
+      "description": "Batch insert rows. Rejects unknown columns unless allow_create_columns=true",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "additionalProperties": true
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {}
+            },
+            "minItems": 1,
+            "additionalProperties": true
+          },
+          "allow_create_columns": {
+            "type": "boolean",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "table",
+          "rows"
+        ],
+        "additionalProperties": true,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "attach_file_to_row",
+      "description": "Attach a file to a row via URL or base64 bytes (<= 5 MB).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "additionalProperties": true
+          },
+          "row_id": {
+            "type": "string",
+            "additionalProperties": true
+          },
+          "column": {
+            "type": "string",
+            "additionalProperties": true
+          },
+          "file": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "filename": {
+                    "type": "string"
+                  },
+                  "content_type": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "url",
+                  "filename"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "bytes_base64": {
+                    "type": "string"
+                  },
+                  "filename": {
+                    "type": "string"
+                  },
+                  "content_type": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "bytes_base64",
+                  "filename"
+                ],
+                "additionalProperties": false
+              }
+            ],
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "table",
+          "row_id",
+          "column",
+          "file"
+        ],
+        "additionalProperties": true,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "bulk_set_select_options",
+      "description": "Bulk update select options for one or more select columns on a table. Only single_select and multi_select columns are supported.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "additionalProperties": true
+          },
+          "updates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "string"
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "color": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 0
+                }
+              },
+              "required": [
+                "column",
+                "options"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "table",
+          "updates"
+        ],
+        "additionalProperties": true,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "delete_rows",
+      "description": "Delete one or more rows from a table by their IDs.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "additionalProperties": true
+          },
+          "row_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "table",
+          "row_ids"
+        ],
+        "additionalProperties": true,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "find_rows",
+      "description": "Find rows using a predicate DSL. Filtering is performed client-side for broad compatibility. Supports and/or/not, eq, ne, in, gt/gte/lt/lte, contains, starts_with, ends_with, is_null.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "additionalProperties": true
+          },
+          "where": {
+            "additionalProperties": true
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1,
+            "additionalProperties": true
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "default": 100,
+            "additionalProperties": true
+          },
+          "order_by": {
+            "type": "string",
+            "additionalProperties": true
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "default": "asc",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "table"
+        ],
+        "additionalProperties": true,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_row",
+      "description": "Get a row by ID from a table",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "additionalProperties": true
+          },
+          "rowId": {
+            "type": "string",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "table",
+          "rowId"
+        ],
+        "additionalProperties": true,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_schema",
+      "description": "Returns the normalized schema for the base",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "link_rows",
+      "description": "Create links between rows by updating the link column with row IDs.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "additionalProperties": true
+          },
+          "link_column": {
+            "type": "string",
+            "additionalProperties": true
+          },
+          "pairs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "from_row_id": {
+                  "type": "string"
+                },
+                "to_row_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "from_row_id",
+                "to_row_id"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "table",
+          "link_column",
+          "pairs"
+        ],
+        "additionalProperties": true,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "list_rows",
+      "description": "List rows from a table with pagination and filters (defaults: page=1, page_size=100)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "type": "object",
+        "description": "List rows from a table with pagination and optional filters/search",
+        "properties": {
+          "table": {
+            "type": "string",
+            "description": "Table name (required)"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1,
+            "description": "Page number (1-based)"
+          },
+          "page_size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000,
+            "default": 100,
+            "description": "Rows per page (max 1000)"
+          },
+          "view": {
+            "type": "string",
+            "description": "Optional SeaTable view name"
+          },
+          "order_by": {
+            "type": "string",
+            "description": "Column name to order by"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "description": "Sort direction"
+          },
+          "filter": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Filter object (implementation specific)"
+          },
+          "search": {
+            "type": "string",
+            "description": "Full-text search substring"
+          }
+        },
+        "required": [
+          "table"
+        ],
+        "additionalProperties": true
+      }
+    },
+    {
+      "name": "list_tables",
+      "description": "List tables in the SeaTable base",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "manage_columns",
+      "description": "Create, update, and delete columns with normalized schema outputs.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "additionalProperties": true
+          },
+          "operations": {
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "type": "string",
+                      "const": "create"
+                    },
+                    "create": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string"
+                        },
+                        "options": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "type"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "create"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "type": "string",
+                      "const": "update"
+                    },
+                    "update": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "new_name": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string"
+                        },
+                        "options": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "update"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "type": "string",
+                      "const": "delete"
+                    },
+                    "delete": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "delete"
+                  ],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "minItems": 1,
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "table",
+          "operations"
+        ],
+        "additionalProperties": true,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "manage_tables",
+      "description": "Create, rename, and delete tables.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "type": "object",
+        "properties": {
+          "operations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "create",
+                    "rename",
+                    "delete"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "new_name": {
+                  "type": "string"
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  }
+                }
+              },
+              "required": [
+                "action",
+                "name"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "operations"
+        ],
+        "additionalProperties": true,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "ping_seatable",
+      "description": "Health check that verifies connectivity and auth to SeaTable",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": true,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "search_rows",
+      "description": "Search rows with a filter object",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "additionalProperties": true
+          },
+          "query": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "table",
+          "query"
+        ],
+        "additionalProperties": true,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "unlink_rows",
+      "description": "Remove links between rows by updating the link column with row IDs.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "additionalProperties": true
+          },
+          "link_column": {
+            "type": "string",
+            "additionalProperties": true
+          },
+          "pairs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "from_row_id": {
+                  "type": "string"
+                },
+                "to_row_id": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "from_row_id",
+                "to_row_id"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "table",
+          "link_column",
+          "pairs"
+        ],
+        "additionalProperties": true,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "update_rows",
+      "description": "Batch update rows. Rejects unknown columns unless allow_create_columns=true",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "additionalProperties": true
+          },
+          "updates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "row_id": {
+                  "type": "string"
+                },
+                "values": {
+                  "type": "object",
+                  "additionalProperties": {}
+                }
+              },
+              "required": [
+                "row_id",
+                "values"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "additionalProperties": true
+          },
+          "allow_create_columns": {
+            "type": "boolean",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "table",
+          "updates"
+        ],
+        "additionalProperties": true,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "upsert_rows",
+      "description": "Batch upsert rows by matching on one or more key columns. If a match exists, update it; otherwise insert a new row. Rejects unknown columns unless allow_create_columns=true.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "annotations": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "additionalProperties": true
+          },
+          "key_columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "additionalProperties": true
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {}
+            },
+            "minItems": 1,
+            "additionalProperties": true
+          },
+          "allow_create_columns": {
+            "type": "boolean",
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "table",
+          "key_columns",
+          "rows"
+        ],
+        "additionalProperties": true,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    }
+  ]
+}

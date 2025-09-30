@@ -86,7 +86,7 @@ Add to `claude_desktop_config.json`:
   "mcpServers": {
     "seatable": {
       "command": "npx",
-  "args": ["-y", "@aspereo/mcp-seatable@1.0.3"],
+      "args": ["-y", "@aspereo/mcp-seatable@1.0.3"],
       "env": {
         "SEATABLE_SERVER_URL": "https://cloud.seatable.io",
         "SEATABLE_API_TOKEN": "your-api-token",
@@ -386,7 +386,7 @@ To avoid unexpected changes when new versions are released, pin the package vers
   "mcpServers": {
     "seatable": {
       "command": "npx",
-  "args": ["-y", "@aspereo/mcp-seatable@1.0.3"],
+      "args": ["-y", "@aspereo/mcp-seatable@1.0.3"],
       "env": {
         "SEATABLE_SERVER_URL": "https://your-seatable-server.com",
         "SEATABLE_API_TOKEN": "your-api-token",
@@ -404,7 +404,7 @@ To avoid unexpected changes when new versions are released, pin the package vers
   "mcp.servers": {
     "seatable": {
       "command": "npx",
-  "args": ["-y", "@aspereo/mcp-seatable@1.0.3"],
+      "args": ["-y", "@aspereo/mcp-seatable@1.0.3"],
       "env": {
         "SEATABLE_SERVER_URL": "https://your-seatable-server.com",
         "SEATABLE_API_TOKEN": "your-api-token",
@@ -422,7 +422,7 @@ To avoid unexpected changes when new versions are released, pin the package vers
   "mcp.servers": {
     "seatable": {
       "command": "npx",
-  "args": ["-y", "@aspereo/mcp-seatable@1.0.3"],
+      "args": ["-y", "@aspereo/mcp-seatable@1.0.3"],
       "env": {
         "SEATABLE_SERVER_URL": "https://your-seatable-server.com",
         "SEATABLE_API_TOKEN": "your-api-token",
