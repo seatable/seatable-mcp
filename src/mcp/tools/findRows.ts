@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { getEnv } from '../../config/env.js'
 import type { SeaTableRow } from '../../seatable/types.js'
 import { ToolRegistrar } from './types.js'
 
@@ -41,7 +42,7 @@ export type Where = z.infer<typeof Where>
 // Use a loose schema for boundary parsing
 const InputSchema = z.object({
   table: z.string(),
-  where: z.unknown(),
+  where: z.unknown(), // Accept anything; we'll normalize below
   page: z.number().int().min(1).optional().default(1),
   page_size: z.number().int().min(1).max(1000).optional().default(100),
   order_by: z.string().optional(),
@@ -129,9 +130,39 @@ export function evalWhere(row: SeaTableRow, where: any): boolean {
   return false
 }
 
+// Normalize shorthand forms:
+// 1) { Name: "foo", Status: "bar" } -> { and: [ { eq: { field:'Name', value:'foo'} }, { eq: { field:'Status', value:'bar'} } ] }
+// 2) { or: [ { Name: 'x' }, { eq:{ field:'Y', value:1}} ] } -> recursively normalized
+// 3) primitives or unexpected shapes are passed through
+function normalizeWhere(where: any, nameToKey?: Record<string,string>): any {
+  if (!where || typeof where !== 'object') return where
+  const operatorKeys = ['eq','ne','in','gt','gte','lt','lte','contains','starts_with','ends_with','is_null','and','or','not']
+  if (operatorKeys.some(k => k in where)) {
+    // Recurse logical wrappers
+  if (Array.isArray(where.and)) where.and = where.and.map((w: any) => normalizeWhere(w, nameToKey))
+  if (Array.isArray(where.or)) where.or = where.or.map((w: any) => normalizeWhere(w, nameToKey))
+    if (where.not) where.not = normalizeWhere(where.not, nameToKey)
+    // Map field names inside leaf operators
+    for (const op of operatorKeys) {
+      if (where[op] && where[op].field && nameToKey && nameToKey[where[op].field]) {
+        where[op].field = nameToKey[where[op].field]
+      }
+    }
+    return where
+  }
+  // Plain object => conjunction of eq clauses; map display names
+  const entries = Object.entries(where)
+  const clauses = entries.map(([field,value]) => {
+    const mapped = nameToKey && nameToKey[field] ? nameToKey[field] : field
+    return { eq: { field: mapped, value }}
+  })
+  if (clauses.length === 1) return clauses[0]
+  return { and: clauses }
+}
+
 export const registerFindRows: ToolRegistrar = (server, { client, getInputSchema }) => {
   server.registerTool(
-    'find_rows_v2',
+    'find_rows',
     {
       title: 'Find Rows',
       description:
@@ -140,6 +171,21 @@ export const registerFindRows: ToolRegistrar = (server, { client, getInputSchema
     },
     async (args: unknown) => {
       const parsed = InputSchema.parse(args)
+      // Build name->key from metadata for friendly field names
+      const metadata = await client.getMetadata()
+      const tables: any[] = (metadata?.tables || metadata?.metadata?.tables) || []
+      const t = tables.find((x) => x.name === parsed.table)
+      const nameToKey: Record<string,string> = {}
+      if (t && Array.isArray(t.columns)) {
+        for (const c of t.columns) {
+          if (c && typeof c.name === 'string' && typeof c.key === 'string') nameToKey[c.name] = c.key
+        }
+      }
+      const normalizedWhere = normalizeWhere(parsed.where, nameToKey)
+      if (getEnv().LOG_LEVEL === 'debug') {
+        // lightweight debug insight
+        console.log('[find_rows]', JSON.stringify({ where_original: parsed.where, normalized: normalizedWhere }))
+      }
       const pageSizeFetch = 1000
       const maxPages = 50 // safety cap (50k rows scanned)
       let page = 1
@@ -152,7 +198,7 @@ export const registerFindRows: ToolRegistrar = (server, { client, getInputSchema
       }
 
       // Apply predicate locally
-      let matched = all.filter((r) => evalWhere(r, parsed.where))
+  let matched = all.filter((r) => evalWhere(r, normalizedWhere))
 
       // Optional ordering
       if (parsed.order_by) {
