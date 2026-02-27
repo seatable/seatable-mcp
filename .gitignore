@@ -9,7 +9,7 @@ yarn-error.log*
 pnpm-debug.log*
 *.log
 # Editor
-.vscode/*.log
+.vscode/
 .DS_Store
 
 .github/instructions/

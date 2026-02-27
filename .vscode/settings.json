@@ -1,8 +1,0 @@
-{
-    "git.enabled": true,
-    "git.alwaysShowStagedChangesResourceGroup": true,
-    "editor.formatOnSave": true,
-    "editor.codeActionsOnSave": {
-        "source.fixAll.eslint": "explicit"
-    }
-}
