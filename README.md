@@ -2,50 +2,60 @@
 
 > **Beta** — This project is under active development. APIs and configuration may change between releases.
 
-The official Model Context Protocol (MCP) server for [SeaTable](https://seatable.io), built and maintained by SeaTable GmbH. It lets AI agents interact with data in your bases — reading, writing, searching, linking, and querying rows through 19 focused tools. The server intentionally focuses on data operations, not schema management (creating/deleting tables or columns), keeping the tool set lean and safe for autonomous agent use. You can run it:
-
-- As a local CLI (stdio) MCP server for direct IDE integration
-- As an HTTP server (Streamable HTTP transport) for network-accessible MCP
-- As a Docker container for self-hosted deployment
+The official Model Context Protocol (MCP) server for [SeaTable](https://seatable.io), built and maintained by SeaTable GmbH. It lets AI agents interact with data in your bases — reading, writing, searching, linking, and querying rows through 19 focused tools. The server intentionally focuses on data operations, not schema management (creating/deleting tables or columns), keeping the tool set lean and safe for autonomous agent use.
 
 ## Quick Start
 
+The fastest way to get started depends on your setup:
+
+- **SeaTable Cloud** — Use the hosted MCP server at `mcp.seatable.com`, no installation needed
+- **Self-hosted SeaTable** — Run the MCP server locally via `npx` in your IDE
+
 ### SeaTable Cloud (hosted MCP server)
 
-If you use [SeaTable Cloud](https://cloud.seatable.io), there is a hosted MCP server ready to use — no installation required. Just point your MCP client to:
+If you use [SeaTable Cloud](https://cloud.seatable.io), there is a hosted MCP server ready to use — no installation required. Configure your MCP client with the Streamable HTTP endpoint:
 
-```
-https://mcp.seatable.com/mcp
-```
-
-Pass your SeaTable API token as a Bearer token in the `Authorization` header. Your MCP client handles this automatically when configured as a Streamable HTTP server.
-
-### Claude Desktop
-
-Add to `claude_desktop_config.json`:
+**Claude Desktop** — add to `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "seatable": {
-      "command": "npx",
-      "args": ["-y", "@seatable/mcp-seatable"],
-      "env": {
-        "SEATABLE_SERVER_URL": "https://cloud.seatable.io",
-        "SEATABLE_API_TOKEN": "your-api-token"
+      "type": "streamable-http",
+      "url": "https://mcp.seatable.com/mcp",
+      "headers": {
+        "Authorization": "Bearer your-api-token"
       }
     }
   }
 }
 ```
 
-### Cursor
-
-Add to Cursor settings (JSON):
+**Cursor / VSCode** — add to your MCP settings (JSON):
 
 ```json
 {
   "mcp.servers": {
+    "seatable": {
+      "type": "streamable-http",
+      "url": "https://mcp.seatable.com/mcp",
+      "headers": {
+        "Authorization": "Bearer your-api-token"
+      }
+    }
+  }
+}
+```
+
+### Self-hosted SeaTable
+
+For self-hosted SeaTable instances, run the MCP server locally via `npx`. Your IDE starts and manages the process automatically.
+
+**Claude Desktop** — add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
     "seatable": {
       "command": "npx",
       "args": ["-y", "@seatable/mcp-seatable"],
@@ -58,9 +68,7 @@ Add to Cursor settings (JSON):
 }
 ```
 
-### VSCode with GitHub Copilot
-
-Add to your VSCode `settings.json`:
+**Cursor / VSCode** — add to your MCP settings (JSON):
 
 ```json
 {
@@ -79,7 +87,7 @@ Add to your VSCode `settings.json`:
 
 ## Deployment Options
 
-The Quick Start examples above run a local stdio process managed by your IDE. For more advanced setups, you can deploy the server as a standalone HTTP service.
+If you need to run your own server instance — for example on your own infrastructure, with multi-base support, or in multi-tenant mode — use one of the options below.
 
 ### HTTP Server (Network Access)
 
