@@ -2,13 +2,23 @@
 
 > **Beta** — This project is under active development. APIs and configuration may change between releases.
 
-A Model Context Protocol (MCP) server for SeaTable that lets AI agents interact with data in your bases — reading, writing, searching, linking, and querying rows through 18 focused tools. The server intentionally focuses on data operations, not schema management (creating/deleting tables or columns), keeping the tool set lean and safe for autonomous agent use. You can run it:
+The official Model Context Protocol (MCP) server for [SeaTable](https://seatable.io), built and maintained by SeaTable GmbH. It lets AI agents interact with data in your bases — reading, writing, searching, linking, and querying rows through 19 focused tools. The server intentionally focuses on data operations, not schema management (creating/deleting tables or columns), keeping the tool set lean and safe for autonomous agent use. You can run it:
 
 - As a local CLI (stdio) MCP server for direct IDE integration
 - As an HTTP server (Streamable HTTP transport) for network-accessible MCP
 - As a Docker container for self-hosted deployment
 
 ## Quick Start
+
+### SeaTable Cloud (hosted MCP server)
+
+If you use [SeaTable Cloud](https://cloud.seatable.io), there is a hosted MCP server ready to use — no installation required. Just point your MCP client to:
+
+```
+https://mcp.seatable.com/mcp
+```
+
+Pass your SeaTable API token as a Bearer token in the `Authorization` header. Your MCP client handles this automatically when configured as a Streamable HTTP server.
 
 ### Claude Desktop
 
