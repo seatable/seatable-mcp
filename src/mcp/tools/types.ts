@@ -24,6 +24,9 @@ export interface ClientLike {
 
     // SQL
     querySql(sql: string, parameters?: any[]): Promise<{ metadata: any; results: any[] }>
+
+    // Collaborators
+    listCollaborators(): Promise<Array<{ email: string; name: string }>>
 }
 
 export type ToolDeps = { client: ClientLike; env: Env; getInputSchema: (schema: any) => any; baseNames?: string[] }

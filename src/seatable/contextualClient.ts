@@ -39,4 +39,7 @@ export class ContextualClient implements ClientLike {
 
     // SQL
     querySql(sql: string, parameters?: any[]) { return this.client.querySql(sql, parameters) }
+
+    // Collaborators
+    listCollaborators() { return this.client.listCollaborators() }
 }

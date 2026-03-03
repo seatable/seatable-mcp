@@ -85,12 +85,19 @@ export class MockSeaTableClient {
   async querySql(sql: string, parameters?: any[]): Promise<{ metadata: any; results: any[] }> {
     // Mock implementation - just return empty results for now
     return {
-      metadata: { 
+      metadata: {
         table_count: this.tables.size,
         sql_query: sql,
         parameters: parameters || []
       },
       results: []
     }
+  }
+
+  async listCollaborators(): Promise<Array<{ email: string; name: string }>> {
+    return [
+      { email: 'admin@example.com', name: 'Admin User' },
+      { email: 'user1@example.com', name: 'Test User' },
+    ]
   }
 }

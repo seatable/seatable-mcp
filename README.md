@@ -2,7 +2,7 @@
 
 > **Beta** — This project is under active development. APIs and configuration may change between releases.
 
-A Model Context Protocol (MCP) server for SeaTable that lets AI agents interact with data in your bases — reading, writing, searching, linking, and querying rows through 16 focused tools. The server intentionally focuses on data operations, not schema management (creating/deleting tables or columns), keeping the tool set lean and safe for autonomous agent use. You can run it:
+A Model Context Protocol (MCP) server for SeaTable that lets AI agents interact with data in your bases — reading, writing, searching, linking, and querying rows through 17 focused tools. The server intentionally focuses on data operations, not schema management (creating/deleting tables or columns), keeping the tool set lean and safe for autonomous agent use. You can run it:
 
 - As a local CLI (stdio) MCP server for direct IDE integration
 - As an HTTP server (Streamable HTTP transport) for network-accessible MCP
@@ -141,6 +141,7 @@ Optional:
 - **`list_tables`** — Get all tables with metadata
 - **`get_schema`** — Get complete database structure
 - **`list_bases`** — List available bases (multi-base mode only)
+- **`list_collaborators`** — List users with access to the base (for collaborator columns)
 
 ### Reading Data
 
@@ -185,7 +186,7 @@ SeaTable bases can contain many different column types. The following table show
 | URL | Yes | `"https://..."` |
 | Rating | Yes | `4` (integer) |
 | Geolocation | Yes | `{"lat": 52.52, "lng": 13.40}` |
-| Collaborator | Yes | `["user@example.com"]` (SeaTable user IDs) |
+| Collaborator | Yes | `["0b995819003140ed8e9efe05e817b000@auth.local"]` — use `list_collaborators` to get user IDs |
 | Link | — | Use `link_rows` / `unlink_rows` tools |
 | Image / File | No | Requires upload API (not supported) |
 | Formula / Link Formula | No | Read-only, computed by SeaTable |

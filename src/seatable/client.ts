@@ -214,6 +214,25 @@ export class SeaTableClient {
         })
     }
 
+    async listCollaborators(): Promise<Array<{ email: string; name: string }>> {
+        await this.ensureInitialized()
+        return this.limiter.schedule(async () => {
+            try {
+                const token = await this.tokenManager.getToken()
+                const uuid = this.tokenManager.getDtableUuid()
+                const url = `${this.serverUrl}/api/v2.1/dtables/${uuid}/related-users/`
+                const res = await axios.get(url, {
+                    headers: { Authorization: `Bearer ${token}` },
+                    timeout: this.timeoutMs,
+                })
+                return res.data.user_list ?? []
+            } catch (err) {
+                logAxiosError(err, 'listCollaborators')
+                throw toCodedAxiosError(err, 'listCollaborators')
+            }
+        })
+    }
+
 }
 
 /** Create a client from environment variables (selfhosted mode). */

@@ -25,6 +25,7 @@ import { registerGetSchema } from './tools/getSchema.js'
 import { registerLinkRows } from './tools/linkRows.js'
 // Tool registrars
 import { registerListBases } from './tools/listBases.js'
+import { registerListCollaborators } from './tools/listCollaborators.js'
 import { registerListRows } from './tools/listRows.js'
 import { registerListTables } from './tools/listTables.js'
 import { registerPingSeatable } from './tools/pingSeatable.js'
@@ -135,6 +136,7 @@ export class SeaTableMCPServer {
         registerUnlinkRows(serverAdapter, deps)
         registerGetSchema(serverAdapter, deps)
         registerQuerySql(serverAdapter, deps)
+        registerListCollaborators(serverAdapter, deps)
         registerPingSeatable(serverAdapter, deps)
 
         // Debug tools (gated by feature flag)
