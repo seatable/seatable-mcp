@@ -43,7 +43,7 @@ describe('TokenManager', () => {
     vi.spyOn(axios, 'create').mockReturnValue({ get } as any)
 
     const tm = new TokenManager({ serverUrl, apiToken })
-    await expect(tm.getToken()).rejects.toThrow('Failed to fetch app-access-token')
+    await expect(tm.getToken()).rejects.toThrow('Failed to authenticate with SeaTable (HTTP 500)')
   })
 
   it('extracts dtable_uuid from token exchange response', async () => {

@@ -85,8 +85,18 @@ export class TokenManager {
             return token
         } catch (err) {
             logAxiosError(err, 'token_exchange_app')
-            const status = (err as AxiosError).response?.status
-            throw new Error(`Failed to fetch app-access-token (${status ?? 'no-status'})`)
+            const axErr = err as AxiosError
+            const status = axErr.response?.status
+            const detail = (axErr.response?.data as any)?.error_msg
+                || (axErr.response?.data as any)?.detail
+                || axErr.code  // e.g. ENOTFOUND, ECONNREFUSED, ETIMEDOUT
+                || axErr.message
+                || 'unknown error'
+            throw new Error(
+                status
+                    ? `Failed to authenticate with SeaTable (HTTP ${status}): ${detail}`
+                    : `Failed to connect to ${this.serverUrl}: ${detail}`
+            )
         }
     }
 }
