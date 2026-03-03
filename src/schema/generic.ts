@@ -15,6 +15,18 @@ export const GenericColumnType = z.enum([
     'url',
     'email',
     'phone',
+    'rate',
+    'duration',
+    'geolocation',
+    'collaborator',
+    'auto_number',
+    'creator',
+    'ctime',
+    'mtime',
+    'last_modifier',
+    'button',
+    'digital_sign',
+    'link_formula',
 ])
 export type GenericColumnType = z.infer<typeof GenericColumnType>
 

@@ -28,4 +28,56 @@ describe('mapMetadataToGeneric', () => {
     expect(cols.find((c) => c.name === 'File')?.type).toBe('attachment')
     expect(cols.find((c) => c.name === 'Image')?.type).toBe('attachment')
   })
+
+  describe('normalizeType — hyphenated types', () => {
+    const makeMetaWithType = (type: string) => ({
+      base_id: 'b1',
+      tables: [
+        {
+          _id: 't1',
+          name: 'T',
+          columns: [{ key: 'c1', name: 'Col', type }],
+        },
+      ],
+    })
+
+    const cases: [string, string][] = [
+      ['single-select', 'single_select'],
+      ['multiple-select', 'multi_select'],
+      ['auto-number', 'auto_number'],
+      ['link-formula', 'link_formula'],
+      ['digital-sign', 'digital_sign'],
+      ['long-text', 'long_text'],
+      ['last-modifier', 'last_modifier'],
+    ]
+
+    for (const [input, expected] of cases) {
+      it(`maps "${input}" to "${expected}"`, () => {
+        const generic = mapMetadataToGeneric(makeMetaWithType(input))
+        expect(generic.tables[0].columns[0].type).toBe(expected)
+      })
+    }
+  })
+
+  describe('normalizeType — new types', () => {
+    const makeMetaWithType = (type: string) => ({
+      base_id: 'b1',
+      tables: [
+        {
+          _id: 't1',
+          name: 'T',
+          columns: [{ key: 'c1', name: 'Col', type }],
+        },
+      ],
+    })
+
+    const directTypes = ['rate', 'duration', 'geolocation', 'collaborator', 'creator', 'ctime', 'mtime', 'button']
+
+    for (const type of directTypes) {
+      it(`maps "${type}" to "${type}"`, () => {
+        const generic = mapMetadataToGeneric(makeMetaWithType(type))
+        expect(generic.tables[0].columns[0].type).toBe(type)
+      })
+    }
+  })
 })

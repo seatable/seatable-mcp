@@ -11,6 +11,7 @@ export type ErrorCode =
   | 'ERR_RATE_LIMITED'
   | 'ERR_SERVER'
   | 'ERR_BAD_REQUEST'
+  | 'ERR_VALIDATION'
 
 export type CodedError = Error & { code: ErrorCode; meta?: Record<string, unknown> }
 

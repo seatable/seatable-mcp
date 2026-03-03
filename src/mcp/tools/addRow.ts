@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { mapMetadataToGeneric } from '../../schema/map.js'
+import { validateRowsAgainstSchema } from '../../schema/validate.js'
 import { ToolRegistrar } from './types.js'
 
 const InputSchema = z.object({
@@ -17,6 +19,9 @@ export const registerAddRow: ToolRegistrar = (server, { client, getInputSchema }
         },
         async (args: unknown) => {
             const { table, row } = InputSchema.parse(args)
+            const metadata = await client.getMetadata()
+            const generic = mapMetadataToGeneric(metadata)
+            validateRowsAgainstSchema(generic, table, [row])
             const created = await client.addRow(table, row)
             return { content: [{ type: 'text', text: JSON.stringify(created) }] }
         }
