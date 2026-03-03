@@ -3,7 +3,7 @@
   "version": "0.9.0",
   "type": "module",
   "license": "MIT",
-  "description": "A comprehensive MCP (Model Context Protocol) server that provides full SeaTable database access through 11 powerful tools",
+  "description": "MCP server for SeaTable — schema introspection, CRUD, SQL queries, linking, and select option management through 20 tools",
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -12,19 +12,18 @@
     "api",
     "server",
     "ai",
-    "assistant",
     "sql",
     "crud"
   ],
-  "author": "Brian Money",
+  "author": "SeaTable GmbH",
   "repository": {
     "type": "git",
-    "url": "https://github.com/brianmoney/mcp-seatable.git"
+    "url": "https://github.com/seatable/seatable-mcp.git"
   },
   "bugs": {
-    "url": "https://github.com/brianmoney/mcp-seatable/issues"
+    "url": "https://github.com/seatable/seatable-mcp/issues"
   },
-  "homepage": "https://github.com/brianmoney/mcp-seatable#readme",
+  "homepage": "https://github.com/seatable/seatable-mcp#readme",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {

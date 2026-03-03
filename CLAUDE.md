@@ -23,7 +23,6 @@ npm run typecheck        # tsc --noEmit
 
 # Manual tool testing (requires .env configured)
 node scripts/mcp-call.cjs <tool_name> '<json_args>'
-SEATABLE_MOCK=true node scripts/test-client.mjs
 ```
 
 Test files live in `tests/` and use the `.spec.ts` suffix with Vitest.
