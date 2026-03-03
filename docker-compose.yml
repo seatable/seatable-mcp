@@ -25,7 +25,7 @@ services:
       - SEATABLE_SERVER_URL
       - SEATABLE_API_TOKEN
       - SEATABLE_BASES
-      - SEATABLE_MODE
+      - SEATABLE_MODE=managed
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
       interval: 30s
