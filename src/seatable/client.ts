@@ -306,6 +306,23 @@ export class SeaTableClient {
         })
     }
 
+    // --- Column options ---
+
+    async addColumnOptions(args: {
+        table: string
+        column: string
+        options: Array<{ name: string; color?: string; textColor?: string }>
+    }): Promise<any> {
+        return this.request('addColumnOptions', async (http) => {
+            const res = await http.post('/column-options/', {
+                table_name: args.table,
+                column: args.column,
+                options: args.options,
+            })
+            return res.data
+        })
+    }
+
     // --- File upload ---
 
     async uploadFile(args: {

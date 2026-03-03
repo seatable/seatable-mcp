@@ -118,6 +118,13 @@ export class MockSeaTableClient {
     return { success: true }
   }
 
+  async addColumnOptions(args: {
+    table: string; column: string;
+    options: Array<{ name: string; color?: string; textColor?: string }>
+  }): Promise<any> {
+    return { success: true }
+  }
+
   async uploadFile(args: {
     table: string; column: string; rowId: string;
     fileName: string; fileData: string; replace?: boolean

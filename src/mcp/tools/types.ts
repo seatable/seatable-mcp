@@ -32,6 +32,9 @@ export interface ClientLike {
     createLinks(args: { table: string; linkColumn: string; pairs: Array<{ fromRowId: string; toRowId: string }> }): Promise<any>
     deleteLinks(args: { table: string; linkColumn: string; pairs: Array<{ fromRowId: string; toRowId: string }> }): Promise<any>
 
+    // Column options
+    addColumnOptions(args: { table: string; column: string; options: Array<{ name: string; color?: string; textColor?: string }> }): Promise<any>
+
     // File upload
     uploadFile(args: {
         table: string; column: string; rowId: string;

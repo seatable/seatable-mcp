@@ -16,6 +16,7 @@ import { ClientRegistry } from '../seatable/clientRegistry.js'
 import { ContextualClient } from '../seatable/contextualClient.js'
 import { MockSeaTableClient } from '../seatable/mockClient.js'
 import { registerAddRow } from './tools/addRow.js'
+import { registerAddSelectOptions } from './tools/addSelectOption.js'
 import { registerAppendRows } from './tools/appendRows.js'
 import { registerDeleteRows } from './tools/deleteRow.js'
 import { registerEchoArgs } from './tools/echoArgs.js'
@@ -139,6 +140,7 @@ export class SeaTableMCPServer {
         registerQuerySql(serverAdapter, deps)
         registerListCollaborators(serverAdapter, deps)
         registerUploadFile(serverAdapter, deps)
+        registerAddSelectOptions(serverAdapter, deps)
         registerPingSeatable(serverAdapter, deps)
 
         // Debug tools (gated by feature flag)
