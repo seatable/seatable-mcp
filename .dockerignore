@@ -4,3 +4,4 @@ dist
 .github
 .vscode
 npm-debug.log*
+.env
