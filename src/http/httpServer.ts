@@ -198,6 +198,16 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
             return
         }
 
+        if (req.method === 'GET' && url.pathname === '/.well-known/mcp/server-card.json') {
+            const card = {
+                serverInfo: { name: '@seatable/mcp-seatable', version: VERSION },
+                authentication: { required: true, schemes: ['bearer'] },
+                capabilities: { tools: true, resources: false, prompts: false },
+            }
+            res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(card))
+            return
+        }
+
         res.writeHead(404, { 'content-type': 'text/plain' }).end('Not found')
     })
 
