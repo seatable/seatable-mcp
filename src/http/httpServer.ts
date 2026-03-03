@@ -7,6 +7,7 @@ import { TokenValidator } from '../auth/tokenValidator.js'
 import { getEnv, type ServerMode } from '../config/env.js'
 import { logger } from '../logger.js'
 import { buildServer } from '../mcp/server.js'
+import { RateLimitManager } from '../ratelimit/index.js'
 
 export interface StartHttpServerOptions {
     host?: string
@@ -48,6 +49,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
     const env = getEnv()
     const mode: ServerMode = env.SEATABLE_MODE
     const tokenValidator = mode === 'managed' ? new TokenValidator(env.SEATABLE_SERVER_URL) : undefined
+    const rateLimiter = mode === 'managed' ? new RateLimitManager() : undefined
 
     const sessions = new Map<string, ActiveSession>()
 
@@ -57,7 +59,29 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
         return auth.slice(7)
     }
 
+    function getClientIp(req: IncomingMessage): string {
+        const forwarded = req.headers['x-forwarded-for']
+        if (typeof forwarded === 'string') return forwarded.split(',')[0].trim()
+        return req.socket.remoteAddress ?? 'unknown'
+    }
+
     async function handleMcpRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+        // Rate limiting (managed mode only)
+        if (rateLimiter) {
+            const ip = getClientIp(req)
+            const sessionId_ = req.headers['mcp-session-id'] as string | undefined
+            const token = sessionId_ ? sessions.get(sessionId_)?.apiToken : undefined
+            const result = rateLimiter.check({ ip, token })
+            if (!result.allowed) {
+                const retryAfter = Math.ceil(result.retryAfterMs / 1000)
+                res.writeHead(429, {
+                    'content-type': 'text/plain',
+                    'retry-after': String(retryAfter),
+                }).end(result.reason)
+                return
+            }
+        }
+
         // Parse body for POST requests
         const body = req.method === 'POST' ? await parseJsonBody(req) : undefined
 
@@ -81,6 +105,14 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
                 }
             }
 
+            // Connection limit (managed mode)
+            if (rateLimiter && apiToken) {
+                if (!rateLimiter.connections.acquire(apiToken)) {
+                    res.writeHead(429, { 'content-type': 'text/plain' }).end('Too many concurrent connections')
+                    return
+                }
+            }
+
             const mcpServer = buildServer(apiToken ? { apiToken } : undefined)
             const transport = new StreamableHTTPServerTransport({
                 sessionIdGenerator: () => randomUUID(),
@@ -94,6 +126,9 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
             const cleanup = async () => {
                 if (cleaned) return
                 cleaned = true
+                if (apiToken && rateLimiter) {
+                    rateLimiter.connections.release(apiToken)
+                }
                 if (transport.sessionId) {
                     sessions.delete(transport.sessionId)
                 }
@@ -171,6 +206,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
 
     const shutdown = async () => {
         tokenValidator?.destroy()
+        rateLimiter?.destroy()
         for (const [sessionId, session] of sessions.entries()) {
             logger.debug({ sessionId }, 'Closing session during shutdown')
             await session.close()
