@@ -2,7 +2,7 @@
 
 > **Beta** — This project is under active development. APIs and configuration may change between releases.
 
-A Model Context Protocol (MCP) server for SeaTable that exposes database capabilities (schema introspection, CRUD, querying, linking, select option management) through 20 tools. You can run it:
+A Model Context Protocol (MCP) server for SeaTable that lets AI agents interact with data in your bases — reading, writing, searching, linking, and querying rows through 16 focused tools. The server intentionally focuses on data operations, not schema management (creating/deleting tables or columns), keeping the tool set lean and safe for autonomous agent use. You can run it:
 
 - As a local CLI (stdio) MCP server for direct IDE integration
 - As an HTTP server (Streamable HTTP transport) for network-accessible MCP
@@ -136,34 +136,36 @@ Optional:
 
 ## MCP Tools
 
-### Core Data Operations
+### Schema Introspection
 
 - **`list_tables`** — Get all tables with metadata
 - **`get_schema`** — Get complete database structure
+- **`list_bases`** — List available bases (multi-base mode only)
+
+### Reading Data
+
 - **`list_rows`** — Paginated row listing with sorting
+- **`get_row`** — Retrieve specific row by ID
 - **`find_rows`** — Client-side filtering with DSL
 - **`search_rows`** — Search via SQL WHERE clauses
-- **`get_row`** — Retrieve specific row by ID
+- **`query_sql`** — Execute SQL queries with parameterized inputs
+
+### Writing Data
+
 - **`add_row`** — Add single new row
 - **`append_rows`** — Batch insert rows
 - **`update_rows`** — Batch update rows
 - **`upsert_rows`** — Insert or update rows by key columns
 - **`delete_rows`** — Remove rows by ID
+
+### Linking
+
 - **`link_rows`** — Create relationships between rows
 - **`unlink_rows`** — Remove relationships between rows
-- **`query_sql`** — Execute SQL queries with parameterized inputs
-
-### Schema Management
-
-- **`manage_tables`** — Create, rename, and delete tables
-- **`manage_columns`** — Add, modify, and delete columns
-- **`bulk_set_select_options`** — Manage dropdown/multi-select options
 
 ### Utilities
 
-- **`list_bases`** — List available bases (multi-base mode only)
 - **`ping_seatable`** — Health check with latency monitoring
-- **`attach_file_to_row`** — File attachment (stub)
 
 ## Tool Examples
 

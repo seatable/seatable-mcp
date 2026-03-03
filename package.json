@@ -3,7 +3,7 @@
   "version": "0.9.0",
   "type": "module",
   "license": "MIT",
-  "description": "MCP server for SeaTable — schema introspection, CRUD, SQL queries, linking, and select option management through 20 tools",
+  "description": "MCP server for SeaTable — read, write, search, link, and query data in your bases through 16 focused tools",
   "keywords": [
     "mcp",
     "model-context-protocol",

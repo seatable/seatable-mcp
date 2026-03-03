@@ -125,29 +125,6 @@ export class SeaTableClient {
         return (meta.tables ?? []) as SeaTableTable[]
     }
 
-    async createTable(tableName: string, columns?: Array<Record<string, unknown>>): Promise<{ name: string }> {
-        return this.request('createTable', async (http) => {
-            const body: Record<string, unknown> = { table_name: tableName }
-            if (columns) body.columns = columns
-            const res = await http.post('/tables/', body)
-            return res.data
-        })
-    }
-
-    async renameTable(from: string, to: string): Promise<{ name: string }> {
-        return this.request('renameTable', async (http) => {
-            const res = await http.put('/tables/', { table_name: from, new_table_name: to })
-            return res.data
-        })
-    }
-
-    async deleteTable(name: string): Promise<{ success: boolean }> {
-        return this.request('deleteTable', async (http) => {
-            const res = await http.delete('/tables/', { data: { table_name: name } })
-            return res.data
-        })
-    }
-
     // --- Rows ---
 
     async listRows(query: {
@@ -237,48 +214,6 @@ export class SeaTableClient {
         })
     }
 
-    // --- Columns ---
-
-    async createColumn(table: string, column: Record<string, unknown>): Promise<any> {
-        return this.request('createColumn', async (http) => {
-            const res = await http.post('/columns/', { table_name: table, ...column })
-            return res.data
-        })
-    }
-
-    async updateColumn(table: string, columnName: string, patch: Record<string, unknown>): Promise<any> {
-        return this.request('updateColumn', async (http) => {
-            const res = await http.put('/columns/', {
-                table_name: table,
-                column: columnName,
-                ...patch,
-            })
-            return res.data
-        })
-    }
-
-    async deleteColumn(table: string, columnName: string): Promise<{ success: boolean }> {
-        return this.request('deleteColumn', async (http) => {
-            const res = await http.delete('/columns/', {
-                data: { table_name: table, column: columnName },
-            })
-            return res.data
-        })
-    }
-
-    async updateSelectOptions(
-        table: string,
-        column: string,
-        options: any[],
-        return_options?: boolean
-    ): Promise<any> {
-        return this.request('updateSelectOptions', async (http) => {
-            const body: Record<string, unknown> = { table_name: table, column, options }
-            if (return_options) body.return_options = true
-            const res = await http.put('/column-options/', body)
-            return res.data
-        })
-    }
 }
 
 /** Create a client from environment variables (selfhosted mode). */

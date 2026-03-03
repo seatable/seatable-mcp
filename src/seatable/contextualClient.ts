@@ -25,14 +25,6 @@ export class ContextualClient implements ClientLike {
 
     // Tables
     listTables() { return this.client.listTables() }
-    createTable(tableName: string, columns?: Array<Record<string, unknown>>) { return this.client.createTable(tableName, columns) }
-    renameTable(from: string, to: string) { return this.client.renameTable(from, to) }
-    deleteTable(name: string) { return this.client.deleteTable(name) }
-
-    // Columns
-    createColumn(table: string, column: Record<string, unknown>) { return this.client.createColumn(table, column) }
-    updateColumn(table: string, columnName: string, patch: Record<string, unknown>) { return this.client.updateColumn(table, columnName, patch) }
-    deleteColumn(table: string, columnName: string) { return this.client.deleteColumn(table, columnName) }
 
     // Metadata
     getMetadata() { return this.client.getMetadata() }
@@ -47,7 +39,4 @@ export class ContextualClient implements ClientLike {
 
     // SQL
     querySql(sql: string, parameters?: any[]) { return this.client.querySql(sql, parameters) }
-
-    // Select options
-    updateSelectOptions(table: string, column: string, options: any[], return_options?: boolean) { return this.client.updateSelectOptions(table, column, options, return_options) }
 }

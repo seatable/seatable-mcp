@@ -17,8 +17,6 @@ import { ContextualClient } from '../seatable/contextualClient.js'
 import { MockSeaTableClient } from '../seatable/mockClient.js'
 import { registerAddRow } from './tools/addRow.js'
 import { registerAppendRows } from './tools/appendRows.js'
-import { registerAttachFileToRow } from './tools/attachFileToRow.js'
-import { registerBulkSetSelectOptions } from './tools/bulkSetSelectOptions.js'
 import { registerDeleteRows } from './tools/deleteRow.js'
 import { registerEchoArgs } from './tools/echoArgs.js'
 import { registerFindRows } from './tools/findRows.js'
@@ -29,8 +27,6 @@ import { registerLinkRows } from './tools/linkRows.js'
 import { registerListBases } from './tools/listBases.js'
 import { registerListRows } from './tools/listRows.js'
 import { registerListTables } from './tools/listTables.js'
-import { registerManageColumns } from './tools/manageColumns.js'
-import { registerManageTables } from './tools/manageTables.js'
 import { registerPingSeatable } from './tools/pingSeatable.js'
 import { registerQuerySql } from './tools/querySql.js'
 import { registerSearchRows } from './tools/searchRows.js'
@@ -138,12 +134,8 @@ export class SeaTableMCPServer {
         registerLinkRows(serverAdapter, deps)
         registerUnlinkRows(serverAdapter, deps)
         registerGetSchema(serverAdapter, deps)
-        registerManageTables(serverAdapter, deps)
-        registerManageColumns(serverAdapter, deps)
         registerQuerySql(serverAdapter, deps)
         registerPingSeatable(serverAdapter, deps)
-        registerAttachFileToRow(serverAdapter, deps)
-        registerBulkSetSelectOptions(serverAdapter, deps)
 
         // Debug tools (gated by feature flag)
         if (env.SEATABLE_ENABLE_DEBUG_TOOLS) {

@@ -16,49 +16,6 @@ export class MockSeaTableClient {
     }
   }
 
-  async createTable(tableName: string, _columns?: Array<Record<string, unknown>>): Promise<{ name: string }> {
-    this.ensureTable(tableName)
-    return { name: tableName }
-  }
-  async renameTable(from: string, to: string): Promise<{ name: string }> {
-    const t = this.tables.get(from)
-    if (!t) throw new Error('mock: table not found')
-    this.tables.set(to, t)
-    this.tables.delete(from)
-    return { name: to }
-  }
-  async deleteTable(name: string): Promise<{ success: boolean }> {
-    this.tables.delete(name)
-    return { success: true }
-  }
-
-  async createColumn(table: string, column: Record<string, unknown>) {
-    this.ensureTable(table)
-    const t = this.tables.get(table)!
-    const name = String((column as any).column_name || (column as any).name || 'Unnamed')
-    t.columns.add(name)
-    return { name }
-  }
-  async updateColumn(table: string, _columnName: string, patch: Record<string, unknown>) {
-    this.ensureTable(table)
-    const t = this.tables.get(table)!
-    if (patch && (patch as any).new_column_name) {
-      const from = String(_columnName)
-      const to = String((patch as any).new_column_name)
-      if (t.columns.has(from)) {
-        t.columns.delete(from)
-        t.columns.add(to)
-      }
-    }
-    return { success: true }
-  }
-  async deleteColumn(table: string, columnName: string) {
-    this.ensureTable(table)
-    const t = this.tables.get(table)!
-    t.columns.delete(columnName)
-    return { success: true }
-  }
-
   async listTables(): Promise<SeaTableTable[]> {
     return Array.from(this.tables.entries()).map(([name, t]) => ({ name, _id: t.id }))
   }
@@ -123,10 +80,6 @@ export class MockSeaTableClient {
 
   async searchRows(table: string, query: Record<string, unknown>): Promise<ListRowsResponse> {
     return this.listRows({ table, filter: query })
-  }
-
-  async updateSelectOptions(_table: string, _column: string, options: any[]): Promise<any> {
-    return { success: true, options }
   }
 
   async querySql(sql: string, parameters?: any[]): Promise<{ metadata: any; results: any[] }> {

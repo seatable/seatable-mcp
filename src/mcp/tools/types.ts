@@ -10,14 +10,6 @@ import type { Env } from '../../config/env.js'
 export interface ClientLike {
     // Tables
     listTables(): Promise<Array<{ name: string; _id: string }>>
-    createTable(tableName: string, columns?: Array<Record<string, unknown>>): Promise<{ name: string }>
-    renameTable(from: string, to: string): Promise<{ name: string }>
-    deleteTable(name: string): Promise<{ success: boolean }>
-
-    // Columns
-    createColumn(table: string, column: Record<string, unknown>): Promise<any>
-    updateColumn(table: string, columnName: string, patch: Record<string, unknown>): Promise<any>
-    deleteColumn(table: string, columnName: string): Promise<{ success: boolean }>
 
     // Metadata
     getMetadata(): Promise<any>
@@ -29,10 +21,9 @@ export interface ClientLike {
     updateRow(table: string, rowId: string, row: Record<string, unknown>): Promise<any>
     deleteRow(table: string, rowId: string): Promise<{ success: boolean }>
     searchRows(table: string, query: Record<string, unknown>): Promise<{ rows: any[]; page?: number; page_size?: number; total?: number }>
+
     // SQL
     querySql(sql: string, parameters?: any[]): Promise<{ metadata: any; results: any[] }>
-    // Select options
-    updateSelectOptions(table: string, column: string, options: any[], return_options?: boolean): Promise<any>
 }
 
 export type ToolDeps = { client: ClientLike; env: Env; getInputSchema: (schema: any) => any; baseNames?: string[] }
