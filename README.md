@@ -188,7 +188,7 @@ SeaTable bases can contain many different column types. The following table show
 | Rating | Yes | `4` (integer) |
 | Geolocation | Yes | `{"lat": 52.52, "lng": 13.40}` |
 | Collaborator | Yes | `["0b995819003140ed8e9efe05e817b000@auth.local"]` — use `list_collaborators` to get user IDs |
-| Link | — | Use `link_rows` / `unlink_rows` tools |
+| Link | Yes | Use `link_rows` / `unlink_rows` tools |
 | Image / File | Yes | Use `upload_file` tool with base64-encoded data |
 | Formula / Link Formula | No | Read-only, computed by SeaTable |
 | Creator / Created Time / Modified Time | No | Read-only, set automatically |
