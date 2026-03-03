@@ -167,6 +167,32 @@ Optional:
 
 - **`ping_seatable`** — Health check with latency monitoring
 
+## Supported Column Types
+
+SeaTable bases can contain many different column types. The following table shows which types can be written via the API and what format to use.
+
+| Column Type | Writable | Value Format |
+|---|---|---|
+| Text | Yes | `"string"` |
+| Long Text | Yes | `"Markdown string"` |
+| Number (incl. percent, currency) | Yes | `123.45` |
+| Checkbox | Yes | `true` / `false` |
+| Date | Yes | `"YYYY-MM-DD"` or `"YYYY-MM-DD HH:mm"` |
+| Duration | Yes | `"h:mm"` or `"h:mm:ss"` |
+| Single Select | Yes | `"option name"` |
+| Multiple Select | Yes | `["option a", "option b"]` |
+| Email | Yes | `"user@example.com"` |
+| URL | Yes | `"https://..."` |
+| Rating | Yes | `4` (integer) |
+| Geolocation | Yes | `{"lat": 52.52, "lng": 13.40}` |
+| Collaborator | Yes | `["user@example.com"]` (SeaTable user IDs) |
+| Link | — | Use `link_rows` / `unlink_rows` tools |
+| Image / File | No | Requires upload API (not supported) |
+| Formula / Link Formula | No | Read-only, computed by SeaTable |
+| Creator / Created Time / Modified Time | No | Read-only, set automatically |
+| Auto Number | No | Read-only, set automatically |
+| Button / Digital Signature | No | Not accessible via API |
+
 ## Tool Examples
 
 ```json
