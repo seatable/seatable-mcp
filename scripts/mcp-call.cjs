@@ -6,7 +6,7 @@ const [,, toolName, argsJson] = process.argv;
 const toolArgs = argsJson ? JSON.parse(argsJson) : {};
 
 // Build before running so dist/ reflects latest src changes
-const cmd = "set -a; [ -f .env ] && . .env; set +a; node ./bin/seatable-mcp";
+const cmd = "set -a; [ -f .env ] && . .env; set +a; node ./bin/seatable-mcp.cjs";
 
 const child = spawn('bash', ['-lc', cmd], {
   stdio: ['pipe', 'pipe', 'inherit'],
@@ -28,7 +28,7 @@ function request(method, params) {
     const timer = setTimeout(() => {
       pending.delete(id);
       reject(new Error(`Timeout waiting for ${method}`));
-    }, 20000);
+    }, 60000);
     pending.set(id, { resolve, reject, timer });
     send({ jsonrpc: '2.0', id, method, params });
   });
