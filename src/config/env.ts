@@ -13,7 +13,7 @@ const EnvSchema = z
         SEATABLE_SERVER_URL: z.string().url(),
         SEATABLE_MODE: ServerModeSchema,
         SEATABLE_API_TOKEN: z.string().min(1).optional(),
-        // Multi-base: comma-separated "Name:token" pairs, e.g. "CRM:token_abc,Projects:token_def"
+        // Multi-base: JSON array, e.g. '[{"base_name":"CRM","api_token":"..."}]'
         SEATABLE_BASES: z.string().optional(),
         LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).optional(),
         HTTP_TIMEOUT_MS: z
@@ -82,20 +82,28 @@ export interface BaseEntry {
 }
 
 export function parseBases(raw: string): BaseEntry[] {
-    return raw
-        .split(',')
-        .map((entry) => entry.trim())
-        .filter(Boolean)
-        .map((entry) => {
-            const colonIdx = entry.indexOf(':')
-            if (colonIdx <= 0) {
-                throw new Error(`Invalid SEATABLE_BASES entry: "${entry}" (expected "Name:token")`)
-            }
-            return {
-                name: entry.slice(0, colonIdx).trim(),
-                apiToken: entry.slice(colonIdx + 1).trim(),
-            }
-        })
+    let arr: unknown
+    try {
+        arr = JSON.parse(raw)
+    } catch {
+        throw new Error('SEATABLE_BASES must be a valid JSON array, e.g. \'[{"base_name":"CRM","api_token":"..."}]\'')
+    }
+    if (!Array.isArray(arr) || arr.length === 0) {
+        throw new Error('SEATABLE_BASES must be a non-empty JSON array')
+    }
+    return arr.map((entry: unknown, i: number) => {
+        if (typeof entry !== 'object' || entry === null) {
+            throw new Error(`SEATABLE_BASES[${i}]: expected an object`)
+        }
+        const obj = entry as Record<string, unknown>
+        if (typeof obj.base_name !== 'string' || !obj.base_name) {
+            throw new Error(`SEATABLE_BASES[${i}]: missing or empty "base_name"`)
+        }
+        if (typeof obj.api_token !== 'string' || !obj.api_token) {
+            throw new Error(`SEATABLE_BASES[${i}]: missing or empty "api_token"`)
+        }
+        return { name: obj.base_name, apiToken: obj.api_token }
+    })
 }
 
 export function getEnv(): Env {

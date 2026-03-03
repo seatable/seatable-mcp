@@ -31,7 +31,7 @@ Test files live in `tests/` and use the `.spec.ts` suffix with Vitest.
 
 Required: `SEATABLE_SERVER_URL`
 
-Auth (one required in selfhosted): `SEATABLE_API_TOKEN` (single-base) or `SEATABLE_BASES` (multi-base, format `Name:token,Name:token`)
+Auth (one required in selfhosted): `SEATABLE_API_TOKEN` (single-base) or `SEATABLE_BASES` (multi-base, JSON array `'[{"base_name":"CRM","api_token":"..."}]'`)
 
 Optional: `SEATABLE_MODE` (`selfhosted`|`managed`, default `selfhosted`), `SEATABLE_MOCK=true` (offline mock), `SEATABLE_ENABLE_DEBUG_TOOLS=1` (enables `echo_args` tool)
 

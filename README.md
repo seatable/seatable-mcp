@@ -86,7 +86,7 @@ Serve multiple bases from a single process:
 
 ```bash
 SEATABLE_SERVER_URL=https://your-seatable-server.com \
-SEATABLE_BASES="CRM:token_abc,Projects:token_def" \
+SEATABLE_BASES='[{"base_name":"CRM","api_token":"token_abc"},{"base_name":"Projects","api_token":"token_def"}]' \
 npx -y @seatable/mcp-seatable
 ```
 
@@ -127,7 +127,7 @@ Required:
 Authentication (one of these is required in selfhosted mode):
 
 - `SEATABLE_API_TOKEN` — Single-base API token
-- `SEATABLE_BASES` — Multi-base: comma-separated `Name:token` pairs (e.g. `CRM:token_abc,Projects:token_def`)
+- `SEATABLE_BASES` — Multi-base: JSON array (e.g. `'[{"base_name":"CRM","api_token":"..."}]'`)
 
 Optional:
 
