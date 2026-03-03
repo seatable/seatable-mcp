@@ -30,38 +30,34 @@ Test files live in `tests/` and use the `.spec.ts` suffix with Vitest.
 
 ## Environment Variables
 
-Required: `SEATABLE_SERVER_URL`, `SEATABLE_API_TOKEN`, `SEATABLE_BASE_UUID`
+Required: `SEATABLE_SERVER_URL`, `SEATABLE_API_TOKEN`
 
-Optional: `SEATABLE_TABLE_NAME`, `SEATABLE_MOCK=true` (offline mock), `SEATABLE_ENABLE_DEBUG_TOOLS=1` (enables `echo_args` tool), `SEATABLE_ACCESS_TOKEN_EXP`, `SEATABLE_TOKEN_ENDPOINT_PATH`
+Optional: `SEATABLE_BASE_UUID` (auto-detected from token exchange), `SEATABLE_TABLE_NAME`, `SEATABLE_MOCK=true` (offline mock), `SEATABLE_ENABLE_DEBUG_TOOLS=1` (enables `echo_args` tool), `SEATABLE_ACCESS_TOKEN_EXP`, `SEATABLE_TOKEN_ENDPOINT_PATH`
 
 Copy `.env.example` to `.env` for local development.
 
 ## Architecture
 
-### Server Paths
+### Server
 
-The codebase currently has two separate server implementations:
-
-1. **stdio / SSE path** (`src/index.ts` → `src/mcp/server.ts`): Uses `@modelcontextprotocol/sdk` `Server` class. 11 tools implemented inline.
-2. **Cloudflare Worker path** (`src/cloudflare/`): Uses `McpAgent` + Durable Objects. 19+ tools via `ToolRegistrar` from `src/mcp/tools/`.
-
-The `src/mcp/tools/*.ts` registrar files are only used by the Cloudflare path, not by the stdio/SSE path.
+`src/index.ts` → `src/mcp/server.ts`: Uses `@modelcontextprotocol/sdk` `Server` class. Supports stdio (default) and SSE transports. 19 tools registered via shared registrars from `src/mcp/tools/`.
 
 ### Tool Registration Pattern
 
 Each tool in `src/mcp/tools/<toolName>.ts` exports a `register*` function accepting a `ToolRegistrar`:
 
 ```typescript
-export interface ToolRegistrar {
-  register(name: string, description: string, schema: z.ZodType<object>, handler: ToolHandler): void
-}
+export type ToolRegistrar = (
+  server: McpServerLike,
+  deps: { client: ClientLike; env: Env; getInputSchema: (schema: any) => any }
+) => void
 ```
 
-The handler receives `(args, client)` and returns `CallToolResult` via `formatToolResponse(data, isError)`.
+The server adapter in `server.ts` collects these registrations into an internal `Map<string, RegisteredTool>`.
 
 ### SeaTable Client
 
-`src/seatable/client.ts` (`SeaTableClient`) maintains three Axios instances (`http`, `gatewayHttp`, `externalHttp`) and auto-detects which API surface to use at runtime. Rate limiting (5 RPS via `bottleneck`) and retry with exponential backoff (`axios-retry`) are applied globally.
+`src/seatable/client.ts` (`SeaTableClient`) uses a single Axios instance targeting `/api-gateway/api/v2/dtables/{base_uuid}/`. Lazy initialization: on first API call, performs token exchange and derives `base_uuid` (from env or token response). Rate limiting (5 RPS via `bottleneck`) and retry with exponential backoff (`axios-retry`).
 
 ### Schema Utilities
 
@@ -71,6 +67,4 @@ The handler receives `(args, client)` and returns `CallToolResult` via `formatTo
 ## Known Limitations
 
 - `attach_file_to_row` is a stub — does not upload files.
-- `append_rows` does not validate columns against schema (unlike `upsertRows`).
 - SSE sessions are in-memory and do not survive restarts.
-- Mock-Client missing `querySql`/`linkRows` methods.
