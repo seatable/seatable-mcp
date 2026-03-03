@@ -130,14 +130,66 @@ export function evalWhere(row: SeaTableRow, where: any): boolean {
   return false
 }
 
+// Map common operator aliases to canonical DSL operators
+const OP_ALIASES: Record<string, string> = {
+  '=': 'eq', '==': 'eq', '===': 'eq', 'equals': 'eq',
+  '!=': 'ne', '!==': 'ne', '<>': 'ne', 'not_equal': 'ne',
+  '>': 'gt', '>=': 'gte', '<': 'lt', '<=': 'lte',
+  'like': 'contains', '$eq': 'eq', '$ne': 'ne', '$gt': 'gt',
+  '$gte': 'gte', '$lt': 'lt', '$lte': 'lte', '$in': 'in',
+  '$contains': 'contains',
+}
+
+// Detect { column/field, op/operator, value } pattern from weaker models
+function normalizeFilterObject(where: any): any | null {
+  const col = where.column ?? where.field ?? where.col
+  const op = where.op ?? where.operator ?? where.operation
+  if (typeof col !== 'string' || op == null) return null
+
+  const canonicalOp = OP_ALIASES[String(op).toLowerCase()] ?? String(op).toLowerCase()
+  const val = where.value ?? where.values
+
+  if (canonicalOp === 'in') return { in: { field: col, values: Array.isArray(val) ? val : [val] } }
+  if (canonicalOp === 'is_null') return { is_null: { field: col } }
+  return { [canonicalOp]: { field: col, value: val } }
+}
+
+// Detect MongoDB-style { ColumnName: { $op: value } }
+function normalizeMongoStyle(where: any): any | null {
+  const entries = Object.entries(where)
+  if (entries.length === 0) return null
+  // Every value must be an object with exactly one $-prefixed key
+  if (!entries.every(([, v]) => v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 1 && Object.keys(v)[0].startsWith('$'))) return null
+
+  const clauses = entries.map(([field, cond]: [string, any]) => {
+    const [mongoOp, val] = Object.entries(cond)[0]
+    const canonicalOp = OP_ALIASES[mongoOp.toLowerCase()] ?? mongoOp.slice(1).toLowerCase()
+    if (canonicalOp === 'in') return { in: { field, values: Array.isArray(val) ? val : [val] } }
+    if (canonicalOp === 'is_null') return { is_null: { field } }
+    return { [canonicalOp]: { field, value: val } }
+  })
+  return clauses.length === 1 ? clauses[0] : { and: clauses }
+}
+
 // Normalize shorthand forms:
-// 1) { Name: "foo", Status: "bar" } -> { and: [ { eq: { field:'Name', value:'foo'} }, { eq: { field:'Status', value:'bar'} } ] }
-// 2) { or: [ { Name: 'x' }, { eq:{ field:'Y', value:1}} ] } -> recursively normalized
-// 3) primitives or unexpected shapes are passed through
-// Note: field names are kept as column display names (not converted to keys)
-// because listRows returns rows with display names (convert_keys: true).
-function normalizeWhere(where: any): any {
+// 1) { column, op, value } or { field, operator, value } -> canonical DSL
+// 2) { Name: { $eq: "foo" } } (MongoDB-style) -> canonical DSL
+// 3) { Name: "foo", Status: "bar" } -> { and: [ { eq: { field:'Name', value:'foo'} }, ... ] }
+// 4) { or: [ ... ] } etc. -> recursively normalized
+export function normalizeWhere(where: any): any {
   if (!where || typeof where !== 'object') return where
+
+  // Array of conditions → AND
+  if (Array.isArray(where)) {
+    const clauses = where.map((w: any) => normalizeWhere(w))
+    return clauses.length === 1 ? clauses[0] : { and: clauses }
+  }
+
+  // { column/field, op, value } pattern
+  const filterObj = normalizeFilterObject(where)
+  if (filterObj) return filterObj
+
+  // Canonical DSL operators
   const operatorKeys = ['eq','ne','in','gt','gte','lt','lte','contains','starts_with','ends_with','is_null','and','or','not']
   if (operatorKeys.some(k => k in where)) {
     if (Array.isArray(where.and)) where.and = where.and.map((w: any) => normalizeWhere(w))
@@ -145,6 +197,11 @@ function normalizeWhere(where: any): any {
     if (where.not) where.not = normalizeWhere(where.not)
     return where
   }
+
+  // MongoDB-style { Name: { $eq: value } }
+  const mongoNorm = normalizeMongoStyle(where)
+  if (mongoNorm) return mongoNorm
+
   // Plain object => conjunction of eq clauses
   const entries = Object.entries(where)
   const clauses = entries.map(([field, value]) => ({ eq: { field, value } }))
@@ -158,7 +215,10 @@ export const registerFindRows: ToolRegistrar = (server, { client, getInputSchema
     {
       title: 'Find Rows',
       description:
-        'Find rows using a predicate DSL. Filtering is performed client-side for broad compatibility. Supports and/or/not, eq, ne, in, gt/gte/lt/lte, contains, starts_with, ends_with, is_null.',
+        'Find rows using a predicate DSL. Filtering is performed client-side. ' +
+        'where format: {"eq":{"field":"Name","value":"foo"}} or shorthand {"Name":"foo"}. ' +
+        'Operators: eq, ne, in, gt, gte, lt, lte, contains, starts_with, ends_with, is_null. ' +
+        'Combine with {"and":[...]} or {"or":[...]}. Negate with {"not":{...}}.',
       inputSchema: getInputSchema(InputSchema),
     },
     async (args: unknown) => {
