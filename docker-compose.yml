@@ -17,7 +17,7 @@ services:
       retries: 3
     restart: unless-stopped
 
-  mcp-server:
+  seatable-mcp:
     container_name: seatable-mcp
     image: seatable/seatable-mcp:latest
     labels:
