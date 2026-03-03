@@ -2,11 +2,11 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 
 import { setEnvOverrides } from './config/env.js'
-import { startSseServer } from './http/sseServer.js'
+import { startHttpServer } from './http/httpServer.js'
 import { logger } from './logger.js'
 import { buildServer } from './mcp/server.js'
 
-export { startSseServer } from './http/sseServer.js'
+export { startHttpServer } from './http/httpServer.js'
 export { buildServer } from './mcp/server.js'
 export { SeaTableClient } from './seatable/client.js'
 
@@ -39,7 +39,7 @@ export async function createMcpServer(config?: McpServerConfig) {
     return buildServer()
 }
 
-type TransportMode = 'stdio' | 'sse'
+type TransportMode = 'stdio' | 'http'
 
 function resolveTransport(argv: string[]): TransportMode {
     const envTransport = (typeof process !== 'undefined' && process.env
@@ -47,22 +47,23 @@ function resolveTransport(argv: string[]): TransportMode {
         : undefined)
         ?.toLowerCase()
 
-    if (envTransport === 'sse') return 'sse'
+    // Accept 'sse' as alias for backward compatibility
+    if (envTransport === 'sse' || envTransport === 'http') return 'http'
 
-    if (argv.includes('--sse')) return 'sse'
+    if (argv.includes('--sse') || argv.includes('--http')) return 'http'
 
     const transportArg = argv.find((arg) => arg.startsWith('--transport='))
     if (transportArg) {
         const value = transportArg.split('=')[1]?.toLowerCase()
-        if (value === 'sse') return 'sse'
+        if (value === 'sse' || value === 'http') return 'http'
     }
 
     return 'stdio'
 }
 
 async function main() {
-    if (resolveTransport(process.argv.slice(2)) === 'sse') {
-        await runSseServerCli()
+    if (resolveTransport(process.argv.slice(2)) === 'http') {
+        await runHttpServerCli()
         return
     }
 
@@ -85,9 +86,9 @@ export async function runCli() {
     return main()
 }
 
-async function runSseServerCli() {
-    const server = await startSseServer()
-    logger.info('MCP SeaTable server running (SSE)')
+async function runHttpServerCli() {
+    const server = await startHttpServer()
+    logger.info('MCP SeaTable server running (Streamable HTTP)')
     await new Promise<void>((resolve, reject) => {
         server.on('close', resolve)
         server.on('error', reject)

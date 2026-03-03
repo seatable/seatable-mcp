@@ -3,7 +3,8 @@
 A Model Context Protocol (MCP) server for SeaTable that exposes database capabilities (schema introspection, CRUD, querying, linking, select option management) through 19 tools. You can run it:
 
 - As a local CLI (stdio) MCP server for direct IDE integration
-- As an HTTP SSE server for network-accessible MCP
+- As an HTTP server (Streamable HTTP transport) for network-accessible MCP
+- As a Docker container for self-hosted deployment
 
 ## Quick Start
 
@@ -64,15 +65,31 @@ Add to your VSCode `settings.json`:
 }
 ```
 
-### SSE Server (Network Access)
+### HTTP Server (Network Access)
 
-Run a local HTTP server with SSE transport:
+Run a local HTTP server with Streamable HTTP transport:
 
 ```bash
 PORT=3001 npx -y @aspereo/mcp-seatable --sse
 
-# Test endpoints
+# Health check
 curl http://localhost:3001/health
+
+# MCP endpoint: POST/GET/DELETE http://localhost:3001/mcp
+```
+
+### Docker
+
+```bash
+docker build -t seatable-mcp .
+docker run -d --name seatable-mcp \
+  -p 3000:3000 \
+  -e SEATABLE_SERVER_URL=https://your-seatable-server.com \
+  -e SEATABLE_API_TOKEN=your-api-token \
+  seatable-mcp
+
+# Health check
+curl http://localhost:3000/health
 ```
 
 ## Environment Variables
