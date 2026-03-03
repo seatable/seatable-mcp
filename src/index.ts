@@ -8,7 +8,9 @@ import { buildServer } from './mcp/server.js'
 
 export { startHttpServer } from './http/httpServer.js'
 export { buildServer } from './mcp/server.js'
-export { SeaTableClient } from './seatable/client.js'
+export { SeaTableClient, createClientFromEnv, createClientFromToken } from './seatable/client.js'
+export type { SeaTableClientConfig } from './seatable/client.js'
+export type { ServerMode } from './config/env.js'
 
 export interface McpServerConfig {
     serverUrl?: string

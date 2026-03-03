@@ -10,6 +10,14 @@ import { TokenManager } from './tokenManager.js'
 import { ListRowsResponse, SeaTableRow, SeaTableTable } from './types.js'
 import { logAxiosError } from './utils.js'
 
+export interface SeaTableClientConfig {
+    serverUrl: string
+    apiToken: string
+    baseUuid?: string
+    timeoutMs?: number
+    accessTokenExp?: string
+}
+
 const ListRowsQuerySchema = z.object({
     table: z.string(),
     page: z.number().int().min(1).default(1),
@@ -27,21 +35,23 @@ export class SeaTableClient {
     private readonly limiter: Bottleneck
     private readonly serverUrl: string
     private readonly configuredBaseUuid?: string
+    private readonly timeoutMs: number
 
     private http?: AxiosInstance
     private baseUuid?: string
     private initialized = false
     private initializing?: Promise<void>
 
-    constructor() {
-        const env = getEnv()
-        this.serverUrl = env.SEATABLE_SERVER_URL.replace(/\/$/, '')
-        this.configuredBaseUuid = env.SEATABLE_BASE_UUID || undefined
+    constructor(config: SeaTableClientConfig) {
+        this.serverUrl = config.serverUrl.replace(/\/$/, '')
+        this.configuredBaseUuid = config.baseUuid || undefined
+        this.timeoutMs = config.timeoutMs ?? 30000
 
         this.tokenManager = new TokenManager({
             serverUrl: this.serverUrl,
-            apiToken: env.SEATABLE_API_TOKEN,
-            timeoutMs: env.HTTP_TIMEOUT_MS,
+            apiToken: config.apiToken,
+            timeoutMs: config.timeoutMs,
+            accessTokenExp: config.accessTokenExp,
         })
 
         this.limiter = new Bottleneck({ maxConcurrent: 1, minTime: 200 }) // 5 RPS
@@ -74,7 +84,7 @@ export class SeaTableClient {
 
         this.http = axios.create({
             baseURL,
-            timeout: getEnv().HTTP_TIMEOUT_MS ?? 30000,
+            timeout: this.timeoutMs,
         })
 
         // Add Bearer token to every request
@@ -276,4 +286,30 @@ export class SeaTableClient {
             return res.data
         })
     }
+}
+
+/** Create a client from environment variables (selfhosted mode). */
+export function createClientFromEnv(): SeaTableClient {
+    const env = getEnv()
+    if (!env.SEATABLE_API_TOKEN) {
+        throw new Error('SEATABLE_API_TOKEN is required to create a client from env')
+    }
+    return new SeaTableClient({
+        serverUrl: env.SEATABLE_SERVER_URL,
+        apiToken: env.SEATABLE_API_TOKEN,
+        baseUuid: env.SEATABLE_BASE_UUID,
+        timeoutMs: env.HTTP_TIMEOUT_MS,
+        accessTokenExp: env.SEATABLE_ACCESS_TOKEN_EXP,
+    })
+}
+
+/** Create a client from a provided API token (managed mode). Server URL from env. */
+export function createClientFromToken(apiToken: string): SeaTableClient {
+    const env = getEnv()
+    return new SeaTableClient({
+        serverUrl: env.SEATABLE_SERVER_URL,
+        apiToken,
+        timeoutMs: env.HTTP_TIMEOUT_MS,
+        accessTokenExp: env.SEATABLE_ACCESS_TOKEN_EXP,
+    })
 }

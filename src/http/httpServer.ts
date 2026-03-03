@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto'
 
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 
+import { TokenValidator } from '../auth/tokenValidator.js'
+import { getEnv, type ServerMode } from '../config/env.js'
 import { logger } from '../logger.js'
 import { buildServer } from '../mcp/server.js'
 
@@ -13,6 +15,7 @@ export interface StartHttpServerOptions {
 
 type ActiveSession = {
     transport: StreamableHTTPServerTransport
+    apiToken?: string
     close: () => Promise<void>
 }
 
@@ -42,7 +45,17 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
     const host = options.host ?? process.env.HOST ?? '0.0.0.0'
     const port = options.port ?? Number(process.env.PORT ?? 3000)
 
+    const env = getEnv()
+    const mode: ServerMode = env.SEATABLE_MODE
+    const tokenValidator = mode === 'managed' ? new TokenValidator(env.SEATABLE_SERVER_URL) : undefined
+
     const sessions = new Map<string, ActiveSession>()
+
+    function extractBearerToken(req: IncomingMessage): string | undefined {
+        const auth = req.headers.authorization
+        if (!auth?.startsWith('Bearer ')) return undefined
+        return auth.slice(7)
+    }
 
     async function handleMcpRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
         // Parse body for POST requests
@@ -53,12 +66,27 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
 
         // For POST without session ID: this is an initialization request → new session
         if (req.method === 'POST' && !sessionId) {
-            const mcpServer = buildServer()
+            // In managed mode: require and validate Bearer token
+            let apiToken: string | undefined
+            if (mode === 'managed') {
+                apiToken = extractBearerToken(req)
+                if (!apiToken) {
+                    res.writeHead(401, { 'content-type': 'text/plain' }).end('Missing Authorization header')
+                    return
+                }
+                const valid = await tokenValidator!.validate(apiToken)
+                if (!valid) {
+                    res.writeHead(401, { 'content-type': 'text/plain' }).end('Invalid API token')
+                    return
+                }
+            }
+
+            const mcpServer = buildServer(apiToken ? { apiToken } : undefined)
             const transport = new StreamableHTTPServerTransport({
                 sessionIdGenerator: () => randomUUID(),
                 onsessioninitialized: (id) => {
                     logger.info({ sessionId: id }, 'Streamable HTTP session initialized')
-                    sessions.set(id, { transport, close: cleanup })
+                    sessions.set(id, { transport, apiToken, close: cleanup })
                 },
             })
 
@@ -142,6 +170,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
     logger.info({ host, port, endpoint: '/mcp' }, 'Streamable HTTP server listening')
 
     const shutdown = async () => {
+        tokenValidator?.destroy()
         for (const [sessionId, session] of sessions.entries()) {
             logger.debug({ sessionId }, 'Closing session during shutdown')
             await session.close()

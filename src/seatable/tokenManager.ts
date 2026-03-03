@@ -1,6 +1,5 @@
 import axios, { AxiosError, AxiosInstance } from 'axios'
 
-import { getEnv } from '../config/env.js'
 import { logAxiosError } from './utils.js'
 
 export type TokenInfo = {
@@ -13,13 +12,15 @@ export class TokenManager {
     private readonly http: AxiosInstance
     private readonly serverUrl: string
     private readonly apiToken: string
+    private readonly accessTokenExp: string
 
     private current?: TokenInfo
     private refreshing?: Promise<string>
 
-    constructor(opts: { serverUrl: string; apiToken: string; timeoutMs?: number }) {
+    constructor(opts: { serverUrl: string; apiToken: string; timeoutMs?: number; accessTokenExp?: string }) {
         this.serverUrl = opts.serverUrl.replace(/\/$/, '')
         this.apiToken = opts.apiToken
+        this.accessTokenExp = opts.accessTokenExp || '1h'
         this.http = axios.create({ timeout: opts.timeoutMs ?? 15000 })
     }
 
@@ -70,9 +71,7 @@ export class TokenManager {
     }
 
     private async fetchAppToken(): Promise<string> {
-        const env = getEnv()
-        const expParam = env.SEATABLE_ACCESS_TOKEN_EXP || '1h'
-        const url = `${this.serverUrl}/api/v2.1/dtable/app-access-token/?exp=${encodeURIComponent(expParam)}`
+        const url = `${this.serverUrl}/api/v2.1/dtable/app-access-token/?exp=${encodeURIComponent(this.accessTokenExp)}`
         try {
             const res = await this.http.get(url, { headers: { Authorization: `Bearer ${this.apiToken}` } })
             const { token, expiresAt, dtableUuid } = this.extractTokenAndExpiry(res.data)

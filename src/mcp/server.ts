@@ -11,7 +11,7 @@ import { type Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 
 import { getEnv } from '../config/env.js'
 import { logger } from '../logger.js'
-import { SeaTableClient } from '../seatable/client.js'
+import { SeaTableClient, createClientFromEnv, createClientFromToken } from '../seatable/client.js'
 import { MockSeaTableClient } from '../seatable/mockClient.js'
 import type { McpServerLike, ClientLike } from './tools/types.js'
 
@@ -182,9 +182,21 @@ export class SeaTableMCPServer {
     }
 }
 
-export function buildServer() {
+export interface BuildServerOptions {
+    apiToken?: string
+}
+
+export function buildServer(options?: BuildServerOptions) {
     const env = getEnv()
-    const client = (env.SEATABLE_MOCK ? new MockSeaTableClient() : new SeaTableClient()) as unknown as SeaTableClient
+    let client: SeaTableClient
+
+    if (env.SEATABLE_MOCK) {
+        client = new MockSeaTableClient() as unknown as SeaTableClient
+    } else if (options?.apiToken) {
+        client = createClientFromToken(options.apiToken)
+    } else {
+        client = createClientFromEnv()
+    }
 
     const server = new SeaTableMCPServer(client)
 

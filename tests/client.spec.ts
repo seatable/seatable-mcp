@@ -1,22 +1,31 @@
-import { describe, expect, it, beforeAll } from 'vitest'
-
-beforeAll(() => {
-    process.env.SEATABLE_SERVER_URL = 'http://localhost'
-    process.env.SEATABLE_API_TOKEN = 'test-token'
-    process.env.SEATABLE_BASE_UUID = 'test-base'
-})
+import { describe, expect, it } from 'vitest'
 
 import { SeaTableClient } from '../src/seatable/client'
 
 // Basic shape tests for the client. These are lightweight and do not hit a real API.
 describe('SeaTableClient', () => {
+    const config = {
+        serverUrl: 'http://localhost',
+        apiToken: 'test-token',
+        baseUuid: 'test-base',
+    }
+
     it('constructs without error', () => {
-        const client = new SeaTableClient()
+        const client = new SeaTableClient(config)
+        expect(client).toBeTruthy()
+    })
+
+    it('constructs with all options', () => {
+        const client = new SeaTableClient({
+            ...config,
+            timeoutMs: 5000,
+            accessTokenExp: '3d',
+        })
         expect(client).toBeTruthy()
     })
 
     it('exposes expected methods', () => {
-        const client = new SeaTableClient()
+        const client = new SeaTableClient(config)
         expect(typeof client.getMetadata).toBe('function')
         expect(typeof client.listTables).toBe('function')
         expect(typeof client.listRows).toBe('function')
