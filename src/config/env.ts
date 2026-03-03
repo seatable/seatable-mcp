@@ -4,7 +4,9 @@ import { config as loadEnv } from 'dotenv'
 import { z } from 'zod'
 
 const require = createRequire(import.meta.url)
+
 const pkg = require('../../package.json') as { version: string }
+
 export const VERSION: string = pkg.version
 
 if (typeof process !== 'undefined' && process.versions?.node) {
