@@ -41,7 +41,7 @@ Copy `.env.example` to `.env` for local development.
 
 ### Server
 
-`src/index.ts` → `src/mcp/server.ts`: Uses `@modelcontextprotocol/sdk` `Server` class. Supports stdio (default) and Streamable HTTP (`--sse` / `--http`) transports. 17 data-focused tools registered via shared registrars from `src/mcp/tools/`.
+`src/index.ts` → `src/mcp/server.ts`: Uses `@modelcontextprotocol/sdk` `Server` class. Supports stdio (default) and Streamable HTTP (`--sse` / `--http`) transports. 18 data-focused tools registered via shared registrars from `src/mcp/tools/`.
 
 ### Modes
 
@@ -76,5 +76,4 @@ The server adapter in `server.ts` collects these registrations into an internal 
 
 ## Known Limitations
 
-- `attach_file_to_row` is a stub — does not upload files.
 - HTTP sessions are in-memory and do not survive restarts.

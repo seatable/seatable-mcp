@@ -34,6 +34,7 @@ import { registerSearchRows } from './tools/searchRows.js'
 import type { ClientLike,McpServerLike } from './tools/types.js'
 import { registerUnlinkRows } from './tools/unlinkRows.js'
 import { registerUpdateRows } from './tools/updateRow.js'
+import { registerUploadFile } from './tools/uploadFile.js'
 import { registerUpsertRows } from './tools/upsertRows.js'
 
 // Helper function to convert Zod schemas to JSON Schema for MCP tools
@@ -137,6 +138,7 @@ export class SeaTableMCPServer {
         registerGetSchema(serverAdapter, deps)
         registerQuerySql(serverAdapter, deps)
         registerListCollaborators(serverAdapter, deps)
+        registerUploadFile(serverAdapter, deps)
         registerPingSeatable(serverAdapter, deps)
 
         // Debug tools (gated by feature flag)

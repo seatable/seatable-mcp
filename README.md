@@ -2,7 +2,7 @@
 
 > **Beta** — This project is under active development. APIs and configuration may change between releases.
 
-A Model Context Protocol (MCP) server for SeaTable that lets AI agents interact with data in your bases — reading, writing, searching, linking, and querying rows through 17 focused tools. The server intentionally focuses on data operations, not schema management (creating/deleting tables or columns), keeping the tool set lean and safe for autonomous agent use. You can run it:
+A Model Context Protocol (MCP) server for SeaTable that lets AI agents interact with data in your bases — reading, writing, searching, linking, and querying rows through 18 focused tools. The server intentionally focuses on data operations, not schema management (creating/deleting tables or columns), keeping the tool set lean and safe for autonomous agent use. You can run it:
 
 - As a local CLI (stdio) MCP server for direct IDE integration
 - As an HTTP server (Streamable HTTP transport) for network-accessible MCP
@@ -158,6 +158,7 @@ Optional:
 - **`update_rows`** — Batch update rows
 - **`upsert_rows`** — Insert or update rows by key columns
 - **`delete_rows`** — Remove rows by ID
+- **`upload_file`** — Upload a file or image to a row (base64-encoded)
 
 ### Linking
 
@@ -188,7 +189,7 @@ SeaTable bases can contain many different column types. The following table show
 | Geolocation | Yes | `{"lat": 52.52, "lng": 13.40}` |
 | Collaborator | Yes | `["0b995819003140ed8e9efe05e817b000@auth.local"]` — use `list_collaborators` to get user IDs |
 | Link | — | Use `link_rows` / `unlink_rows` tools |
-| Image / File | No | Requires upload API (not supported) |
+| Image / File | Yes | Use `upload_file` tool with base64-encoded data |
 | Formula / Link Formula | No | Read-only, computed by SeaTable |
 | Creator / Created Time / Modified Time | No | Read-only, set automatically |
 | Auto Number | No | Read-only, set automatically |

@@ -100,4 +100,16 @@ export class MockSeaTableClient {
       { email: 'user1@example.com', name: 'Test User' },
     ]
   }
+
+  async uploadFile(args: {
+    table: string; column: string; rowId: string;
+    fileName: string; fileData: string; replace?: boolean
+  }): Promise<{ file_name: string; file_size: number; asset_url: string; column_type: string }> {
+    return {
+      file_name: args.fileName,
+      file_size: Buffer.from(args.fileData, 'base64').length,
+      asset_url: `/workspace/1/asset/mock-uuid/images/${args.fileName}`,
+      column_type: 'image',
+    }
+  }
 }

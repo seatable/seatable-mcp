@@ -42,4 +42,7 @@ export class ContextualClient implements ClientLike {
 
     // Collaborators
     listCollaborators() { return this.client.listCollaborators() }
+
+    // File upload
+    uploadFile(args: { table: string; column: string; rowId: string; fileName: string; fileData: string; replace?: boolean }) { return this.client.uploadFile(args) }
 }

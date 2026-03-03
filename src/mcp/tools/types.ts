@@ -27,6 +27,12 @@ export interface ClientLike {
 
     // Collaborators
     listCollaborators(): Promise<Array<{ email: string; name: string }>>
+
+    // File upload
+    uploadFile(args: {
+        table: string; column: string; rowId: string;
+        fileName: string; fileData: string; replace?: boolean
+    }): Promise<{ file_name: string; file_size: number; asset_url: string; column_type: string }>
 }
 
 export type ToolDeps = { client: ClientLike; env: Env; getInputSchema: (schema: any) => any; baseNames?: string[] }

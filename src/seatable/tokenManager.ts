@@ -6,6 +6,7 @@ export type TokenInfo = {
     token: string
     expiresAt: number // epoch ms
     dtableUuid?: string
+    workspaceId?: number
 }
 
 export class TokenManager {
@@ -46,14 +47,20 @@ export class TokenManager {
         return this.current?.dtableUuid
     }
 
+    /** Returns workspace_id from the last token exchange, or undefined if not yet fetched. */
+    getWorkspaceId(): number | undefined {
+        return this.current?.workspaceId
+    }
+
     private isExpired(info?: TokenInfo): boolean {
         if (!info) return true
         return Date.now() >= info.expiresAt
     }
 
-    private extractTokenAndExpiry(data: any): { token: string; expiresAt: number; dtableUuid?: string } {
+    private extractTokenAndExpiry(data: any): { token: string; expiresAt: number; dtableUuid?: string; workspaceId?: number } {
         const token: string = data?.access_token || data?.token || ''
         const dtableUuid: string | undefined = data?.dtable_uuid || undefined
+        const workspaceId: number | undefined = typeof data?.workspace_id === 'number' ? data.workspace_id : undefined
         const now = Date.now()
         let expiresAt = now + 60 * 60 * 1000 // default 1h
         const seconds = data?.expires_in ?? data?.expire_in ?? data?.ttl ?? data?.exp
@@ -65,16 +72,16 @@ export class TokenManager {
         }
         // Renew 1 minute early
         expiresAt -= 60 * 1000
-        return { token, expiresAt, dtableUuid }
+        return { token, expiresAt, dtableUuid, workspaceId }
     }
 
     private async fetchAppToken(): Promise<string> {
         const url = `${this.serverUrl}/api/v2.1/dtable/app-access-token/`
         try {
             const res = await this.http.get(url, { headers: { Authorization: `Bearer ${this.apiToken}` } })
-            const { token, expiresAt, dtableUuid } = this.extractTokenAndExpiry(res.data)
+            const { token, expiresAt, dtableUuid, workspaceId } = this.extractTokenAndExpiry(res.data)
             if (!token) throw new Error('App token response missing access token')
-            this.current = { token, expiresAt, dtableUuid }
+            this.current = { token, expiresAt, dtableUuid, workspaceId }
             return token
         } catch (err) {
             logAxiosError(err, 'token_exchange_app')

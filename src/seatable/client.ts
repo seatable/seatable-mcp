@@ -32,6 +32,7 @@ export class SeaTableClient {
     private readonly tokenManager: TokenManager
     private readonly limiter: Bottleneck
     private readonly serverUrl: string
+    private readonly apiToken: string
     private readonly timeoutMs: number
 
     private http?: AxiosInstance
@@ -40,6 +41,7 @@ export class SeaTableClient {
 
     constructor(config: SeaTableClientConfig) {
         this.serverUrl = config.serverUrl.replace(/\/$/, '')
+        this.apiToken = config.apiToken
         this.timeoutMs = config.timeoutMs ?? 30000
 
         this.tokenManager = new TokenManager({
@@ -229,6 +231,97 @@ export class SeaTableClient {
             } catch (err) {
                 logAxiosError(err, 'listCollaborators')
                 throw toCodedAxiosError(err, 'listCollaborators')
+            }
+        })
+    }
+
+    async uploadFile(args: {
+        table: string
+        column: string
+        rowId: string
+        fileName: string
+        fileData: string // base64
+        replace?: boolean
+    }): Promise<{ file_name: string; file_size: number; asset_url: string; column_type: string }> {
+        await this.ensureInitialized()
+        return this.limiter.schedule(async () => {
+            try {
+                const { table, column, rowId, fileName, fileData, replace } = args
+
+                // 1. Validate column type via metadata
+                const metadata = await this.getMetadata()
+                const tableObj = (metadata.tables ?? []).find((t: any) => t.name === table)
+                if (!tableObj) throw new Error(`Table "${table}" not found`)
+                const colObj = (tableObj.columns ?? []).find((c: any) => c.name === column)
+                if (!colObj) throw new Error(`Column "${column}" not found in table "${table}"`)
+                if (colObj.type !== 'image' && colObj.type !== 'file') {
+                    throw new Error(`Column "${column}" is type "${colObj.type}", expected "image" or "file"`)
+                }
+                const columnType: 'image' | 'file' = colObj.type
+
+                // 2. Get upload link (uses original API token, not base token)
+                const uploadLinkUrl = `${this.serverUrl}/api/v2.1/dtable/app-upload-link/`
+                const uploadLinkRes = await axios.get(uploadLinkUrl, {
+                    headers: { Authorization: `Token ${this.apiToken}` },
+                    timeout: this.timeoutMs,
+                })
+                const { upload_link: uploadLink, parent_path: parentPath } = uploadLinkRes.data
+
+                // 3. Upload file via multipart form
+                const fileBuffer = Buffer.from(fileData, 'base64')
+                const formData = new FormData()
+                formData.append('file', new Blob([fileBuffer]), fileName)
+                formData.append('parent_dir', parentPath || '/')
+                // Determine relative path based on column type
+                const relativePath = columnType === 'image' ? '/images' : '/files'
+                formData.append('relative_path', relativePath)
+
+                const uploadRes = await axios.post(`${uploadLink}?ret-json=1`, formData, {
+                    timeout: this.timeoutMs,
+                })
+                const uploaded = Array.isArray(uploadRes.data) ? uploadRes.data[0] : uploadRes.data
+
+                // 4. Construct asset URL
+                const workspaceId = this.tokenManager.getWorkspaceId()
+                const uuid = this.tokenManager.getDtableUuid()
+                if (!workspaceId || !uuid) {
+                    throw new Error('Missing workspace_id or dtable_uuid for asset URL construction')
+                }
+                const assetUrl = `/workspace/${workspaceId}/asset/${uuid}${relativePath}/${uploaded.name}`
+
+                // 5. Merge with existing values unless replace=true
+                let newValue: unknown
+                if (columnType === 'image') {
+                    const urls = [assetUrl]
+                    if (!replace) {
+                        const existingRow = await this.getRow(table, rowId)
+                        const existing = existingRow[column]
+                        if (Array.isArray(existing)) urls.unshift(...existing)
+                    }
+                    newValue = urls
+                } else {
+                    const fileObj = { name: uploaded.name, size: uploaded.size, type: 'file', url: assetUrl }
+                    const files = [fileObj]
+                    if (!replace) {
+                        const existingRow = await this.getRow(table, rowId)
+                        const existing = existingRow[column]
+                        if (Array.isArray(existing)) files.unshift(...existing)
+                    }
+                    newValue = files
+                }
+
+                // 6. Update the row
+                await this.updateRow(table, rowId, { [column]: newValue })
+
+                return {
+                    file_name: uploaded.name,
+                    file_size: uploaded.size ?? fileBuffer.length,
+                    asset_url: assetUrl,
+                    column_type: columnType,
+                }
+            } catch (err) {
+                logAxiosError(err, 'uploadFile')
+                throw toCodedAxiosError(err, 'uploadFile')
             }
         })
     }
