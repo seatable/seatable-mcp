@@ -53,7 +53,8 @@ export const registerUpsertRows: ToolRegistrar = (server, { client, getInputSche
                 }
 
                 if (matches.length === 1) {
-                    const updated = await client.updateRow(table, matches[0]._id, row)
+                    await client.updateRow(table, matches[0]._id, row)
+                    const updated = await client.getRow(table, matches[0]._id)
                     results.push({ action: 'updated', row: updated })
                 } else {
                     const inserted = await client.addRow(table, row)

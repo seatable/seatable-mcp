@@ -30,18 +30,16 @@ export class MockSeaTableClient {
     }
   }
 
-  async listRows(query: { table: string; page?: number; page_size?: number; filter?: Record<string, unknown> }): Promise<ListRowsResponse> {
+  async listRows(query: { table: string; page?: number; page_size?: number; view?: string }): Promise<ListRowsResponse> {
     const t = this.tables.get(query.table)
     if (!t) return { rows: [] }
-    let rows = Array.from(t.rows.values())
-    if (query.filter) {
-      rows = rows.filter((r) => Object.entries(query.filter!).every(([k, v]) => (r as any)[k] === v))
-    }
+    const rows = Array.from(t.rows.values())
     const page = query.page ?? 1
     const pageSize = query.page_size ?? 100
     const start = (page - 1) * pageSize
     const end = start + pageSize
-    return { rows: rows.slice(start, end), page, page_size: pageSize, total: rows.length }
+    const slice = rows.slice(start, end)
+    return { rows: slice, page, page_size: pageSize, has_more: end < rows.length }
   }
 
   async getRow(table: string, rowId: string): Promise<SeaTableRow> {
@@ -79,7 +77,12 @@ export class MockSeaTableClient {
   }
 
   async searchRows(table: string, query: Record<string, unknown>): Promise<ListRowsResponse> {
-    return this.listRows({ table, filter: query })
+    const t = this.tables.get(table)
+    if (!t) return { rows: [] }
+    const rows = Array.from(t.rows.values()).filter((r) =>
+      Object.entries(query).every(([k, v]) => (r as any)[k] === v)
+    )
+    return { rows, page: 1, page_size: rows.length, has_more: false }
   }
 
   async querySql(sql: string, parameters?: any[]): Promise<{ metadata: any; results: any[] }> {

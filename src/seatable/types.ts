@@ -16,6 +16,7 @@ export interface ListRowsResponse {
     page?: number
     page_size?: number
     total?: number
+    has_more?: boolean
 }
 
 export interface SeaTableError {

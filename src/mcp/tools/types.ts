@@ -15,12 +15,12 @@ export interface ClientLike {
     getMetadata(): Promise<any>
 
     // Rows
-    listRows(query: { table: string; page?: number; page_size?: number; filter?: Record<string, unknown>; search?: string; view?: string; order_by?: string; direction?: 'asc' | 'desc' }): Promise<{ rows: any[]; page?: number; page_size?: number; total?: number }>
+    listRows(query: { table: string; page?: number; page_size?: number; view?: string }): Promise<{ rows: any[]; page?: number; page_size?: number; total?: number; has_more?: boolean }>
     getRow(table: string, rowId: string): Promise<any>
     addRow(table: string, row: Record<string, unknown>): Promise<any>
     updateRow(table: string, rowId: string, row: Record<string, unknown>): Promise<any>
     deleteRow(table: string, rowId: string): Promise<{ success: boolean }>
-    searchRows(table: string, query: Record<string, unknown>): Promise<{ rows: any[]; page?: number; page_size?: number; total?: number }>
+    searchRows(table: string, query: Record<string, unknown>): Promise<{ rows: any[]; page?: number; page_size?: number; total?: number; has_more?: boolean }>
 
     // SQL
     querySql(sql: string, parameters?: any[]): Promise<{ metadata: any; results: any[] }>
