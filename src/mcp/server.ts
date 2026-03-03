@@ -1,24 +1,20 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
+import { type Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import {
     CallToolRequestSchema,
-    ListToolsRequestSchema,
     type CallToolResult,
+    ListToolsRequestSchema,
     type ListToolsResult,
 } from '@modelcontextprotocol/sdk/types.js'
-import { zodToJsonSchema } from 'zod-to-json-schema'
 import { z } from 'zod'
-import { type Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
+import { zodToJsonSchema } from 'zod-to-json-schema'
 
 import { getEnv, parseBases } from '../config/env.js'
 import { logger } from '../logger.js'
-import { SeaTableClient, createClientFromEnv, createClientFromToken } from '../seatable/client.js'
+import { createClientFromEnv, createClientFromToken,SeaTableClient } from '../seatable/client.js'
 import { ClientRegistry } from '../seatable/clientRegistry.js'
 import { ContextualClient } from '../seatable/contextualClient.js'
 import { MockSeaTableClient } from '../seatable/mockClient.js'
-import type { McpServerLike, ClientLike } from './tools/types.js'
-
-// Tool registrars
-import { registerListBases } from './tools/listBases.js'
 import { registerAddRow } from './tools/addRow.js'
 import { registerAppendRows } from './tools/appendRows.js'
 import { registerAttachFileToRow } from './tools/attachFileToRow.js'
@@ -29,6 +25,8 @@ import { registerFindRows } from './tools/findRows.js'
 import { registerGetRow } from './tools/getRow.js'
 import { registerGetSchema } from './tools/getSchema.js'
 import { registerLinkRows } from './tools/linkRows.js'
+// Tool registrars
+import { registerListBases } from './tools/listBases.js'
 import { registerListRows } from './tools/listRows.js'
 import { registerListTables } from './tools/listTables.js'
 import { registerManageColumns } from './tools/manageColumns.js'
@@ -36,6 +34,7 @@ import { registerManageTables } from './tools/manageTables.js'
 import { registerPingSeatable } from './tools/pingSeatable.js'
 import { registerQuerySql } from './tools/querySql.js'
 import { registerSearchRows } from './tools/searchRows.js'
+import type { ClientLike,McpServerLike } from './tools/types.js'
 import { registerUnlinkRows } from './tools/unlinkRows.js'
 import { registerUpdateRows } from './tools/updateRow.js'
 import { registerUpsertRows } from './tools/upsertRows.js'

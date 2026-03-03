@@ -6,11 +6,11 @@ import { startHttpServer } from './http/httpServer.js'
 import { logger } from './logger.js'
 import { buildServer } from './mcp/server.js'
 
+export type { ServerMode } from './config/env.js'
 export { startHttpServer } from './http/httpServer.js'
 export { buildServer } from './mcp/server.js'
-export { SeaTableClient, createClientFromEnv, createClientFromToken } from './seatable/client.js'
 export type { SeaTableClientConfig } from './seatable/client.js'
-export type { ServerMode } from './config/env.js'
+export { createClientFromEnv, createClientFromToken,SeaTableClient } from './seatable/client.js'
 
 export interface McpServerConfig {
     serverUrl?: string
