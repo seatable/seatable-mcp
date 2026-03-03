@@ -193,6 +193,11 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
             return
         }
 
+        if (req.method === 'GET' && url.pathname === '/') {
+            res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ name: 'seatable-mcp', version: VERSION, docs: 'https://github.com/seatable/seatable-mcp' }))
+            return
+        }
+
         res.writeHead(404, { 'content-type': 'text/plain' }).end('Not found')
     })
 
