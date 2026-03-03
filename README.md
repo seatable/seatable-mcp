@@ -77,6 +77,10 @@ Add to your VSCode `settings.json`:
 }
 ```
 
+## Deployment Options
+
+The Quick Start examples above run a local stdio process managed by your IDE. For more advanced setups, you can deploy the server as a standalone HTTP service.
+
 ### HTTP Server (Network Access)
 
 Run a local HTTP server with Streamable HTTP transport:
