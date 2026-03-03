@@ -35,7 +35,9 @@ export interface ClientLike {
     updateSelectOptions(table: string, column: string, options: any[], return_options?: boolean): Promise<any>
 }
 
+export type ToolDeps = { client: ClientLike; env: Env; getInputSchema: (schema: any) => any; baseNames?: string[] }
+
 export type ToolRegistrar = (
     server: McpServerLike,
-    deps: { client: ClientLike; env: Env; getInputSchema: (schema: any) => any }
+    deps: ToolDeps
 ) => void

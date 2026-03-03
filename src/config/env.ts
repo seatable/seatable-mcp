@@ -14,6 +14,8 @@ const EnvSchema = z
         SEATABLE_MODE: ServerModeSchema,
         SEATABLE_API_TOKEN: z.string().min(1).optional(),
         SEATABLE_BASE_UUID: z.string().optional(),
+        // Multi-base: comma-separated "Name:token" pairs, e.g. "CRM:token_abc,Projects:token_def"
+        SEATABLE_BASES: z.string().optional(),
         SEATABLE_TABLE_NAME: z.string().optional(),
         LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).optional(),
         HTTP_TIMEOUT_MS: z
@@ -43,10 +45,10 @@ const EnvSchema = z
             .optional(),
     })
     .superRefine((data, ctx) => {
-        if (data.SEATABLE_MODE === 'selfhosted' && !data.SEATABLE_API_TOKEN) {
+        if (data.SEATABLE_MODE === 'selfhosted' && !data.SEATABLE_API_TOKEN && !data.SEATABLE_BASES) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: 'SEATABLE_API_TOKEN is required in selfhosted mode',
+                message: 'SEATABLE_API_TOKEN or SEATABLE_BASES is required in selfhosted mode',
                 path: ['SEATABLE_API_TOKEN'],
             })
         }
@@ -77,6 +79,28 @@ export function setEnvOverrides(values: EnvOverrides | undefined): void {
 
 export function clearEnvOverrides(): void {
     overrides = undefined
+}
+
+export interface BaseEntry {
+    name: string
+    apiToken: string
+}
+
+export function parseBases(raw: string): BaseEntry[] {
+    return raw
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+        .map((entry) => {
+            const colonIdx = entry.indexOf(':')
+            if (colonIdx <= 0) {
+                throw new Error(`Invalid SEATABLE_BASES entry: "${entry}" (expected "Name:token")`)
+            }
+            return {
+                name: entry.slice(0, colonIdx).trim(),
+                apiToken: entry.slice(colonIdx + 1).trim(),
+            }
+        })
 }
 
 export function getEnv(): Env {
