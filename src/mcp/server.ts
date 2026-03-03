@@ -244,7 +244,6 @@ export function buildServer(options?: BuildServerOptions) {
         const registry = new ClientRegistry(bases, {
             serverUrl: env.SEATABLE_SERVER_URL,
             timeoutMs: env.HTTP_TIMEOUT_MS,
-            accessTokenExp: env.SEATABLE_ACCESS_TOKEN_EXP,
         })
         const contextualClient = new ContextualClient(registry)
         const server = new SeaTableMCPServer(contextualClient, {

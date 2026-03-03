@@ -26,8 +26,6 @@ const EnvSchema = z
             .optional()
             .transform((v) => (v === '1' || v === 'true' ? true : false))
             .optional(),
-        // Expiry string passed to app-access-token endpoint, e.g., '3d', '1h'
-        SEATABLE_ACCESS_TOKEN_EXP: z.string().optional(),
         // Feature flags
         SEATABLE_ENABLE_FIND_ROWS: z
             .string()

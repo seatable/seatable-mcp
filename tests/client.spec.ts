@@ -19,7 +19,6 @@ describe('SeaTableClient', () => {
         const client = new SeaTableClient({
             ...config,
             timeoutMs: 5000,
-            accessTokenExp: '3d',
         })
         expect(client).toBeTruthy()
     })

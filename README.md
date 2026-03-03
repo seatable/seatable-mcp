@@ -131,7 +131,6 @@ Optional:
 
 - `SEATABLE_MODE` — `selfhosted` (default) or `managed` (multi-tenant HTTP with per-client auth)
 - `SEATABLE_MOCK=true` — Enable mock mode for offline testing
-- `SEATABLE_ACCESS_TOKEN_EXP` — Token expiry (default: `1h`)
 
 ## MCP Tools
 

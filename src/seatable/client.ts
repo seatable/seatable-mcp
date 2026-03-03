@@ -14,7 +14,6 @@ export interface SeaTableClientConfig {
     serverUrl: string
     apiToken: string
     timeoutMs?: number
-    accessTokenExp?: string
 }
 
 const ListRowsQuerySchema = z.object({
@@ -47,7 +46,6 @@ export class SeaTableClient {
             serverUrl: this.serverUrl,
             apiToken: config.apiToken,
             timeoutMs: config.timeoutMs,
-            accessTokenExp: config.accessTokenExp,
         })
 
         this.limiter = new Bottleneck({ maxConcurrent: 1, minTime: 200 }) // 5 RPS
@@ -293,7 +291,6 @@ export function createClientFromEnv(): SeaTableClient {
         serverUrl: env.SEATABLE_SERVER_URL,
         apiToken: env.SEATABLE_API_TOKEN,
         timeoutMs: env.HTTP_TIMEOUT_MS,
-        accessTokenExp: env.SEATABLE_ACCESS_TOKEN_EXP,
     })
 }
 
@@ -304,6 +301,5 @@ export function createClientFromToken(apiToken: string): SeaTableClient {
         serverUrl: env.SEATABLE_SERVER_URL,
         apiToken,
         timeoutMs: env.HTTP_TIMEOUT_MS,
-        accessTokenExp: env.SEATABLE_ACCESS_TOKEN_EXP,
     })
 }

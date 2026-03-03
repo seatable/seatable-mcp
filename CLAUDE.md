@@ -34,7 +34,7 @@ Required: `SEATABLE_SERVER_URL`
 
 Auth (one required in selfhosted): `SEATABLE_API_TOKEN` (single-base) or `SEATABLE_BASES` (multi-base, format `Name:token,Name:token`)
 
-Optional: `SEATABLE_MODE` (`selfhosted`|`managed`, default `selfhosted`), `SEATABLE_MOCK=true` (offline mock), `SEATABLE_ENABLE_DEBUG_TOOLS=1` (enables `echo_args` tool), `SEATABLE_ACCESS_TOKEN_EXP`
+Optional: `SEATABLE_MODE` (`selfhosted`|`managed`, default `selfhosted`), `SEATABLE_MOCK=true` (offline mock), `SEATABLE_ENABLE_DEBUG_TOOLS=1` (enables `echo_args` tool)
 
 Copy `.env.example` to `.env` for local development.
 
