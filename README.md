@@ -19,7 +19,7 @@ Add to `claude_desktop_config.json`:
   "mcpServers": {
     "seatable": {
       "command": "npx",
-      "args": ["-y", "@aspereo/mcp-seatable"],
+      "args": ["-y", "@seatable/mcp-seatable"],
       "env": {
         "SEATABLE_SERVER_URL": "https://cloud.seatable.io",
         "SEATABLE_API_TOKEN": "your-api-token"
@@ -38,7 +38,7 @@ Add to Cursor settings (JSON):
   "mcp.servers": {
     "seatable": {
       "command": "npx",
-      "args": ["-y", "@aspereo/mcp-seatable"],
+      "args": ["-y", "@seatable/mcp-seatable"],
       "env": {
         "SEATABLE_SERVER_URL": "https://your-seatable-server.com",
         "SEATABLE_API_TOKEN": "your-api-token"
@@ -57,7 +57,7 @@ Add to your VSCode `settings.json`:
   "mcp.servers": {
     "seatable": {
       "command": "npx",
-      "args": ["-y", "@aspereo/mcp-seatable"],
+      "args": ["-y", "@seatable/mcp-seatable"],
       "env": {
         "SEATABLE_SERVER_URL": "https://your-seatable-server.com",
         "SEATABLE_API_TOKEN": "your-api-token"
@@ -72,7 +72,7 @@ Add to your VSCode `settings.json`:
 Run a local HTTP server with Streamable HTTP transport:
 
 ```bash
-PORT=3001 npx -y @aspereo/mcp-seatable --sse
+PORT=3001 npx -y @seatable/mcp-seatable --sse
 
 # Health check
 curl http://localhost:3001/health
@@ -87,7 +87,7 @@ Serve multiple bases from a single process:
 ```bash
 SEATABLE_SERVER_URL=https://your-seatable-server.com \
 SEATABLE_BASES="CRM:token_abc,Projects:token_def" \
-npx -y @aspereo/mcp-seatable
+npx -y @seatable/mcp-seatable
 ```
 
 Each tool automatically gets a `base` parameter. Use `list_bases` to see available bases.
@@ -99,7 +99,7 @@ For hosting an MCP endpoint where each client authenticates with their own SeaTa
 ```bash
 SEATABLE_MODE=managed \
 SEATABLE_SERVER_URL=https://your-seatable-server.com \
-PORT=3000 npx -y @aspereo/mcp-seatable --sse
+PORT=3000 npx -y @seatable/mcp-seatable --sse
 ```
 
 Clients pass their API token via `Authorization: Bearer <token>` on session initialization. The server validates the token against SeaTable and applies rate limits (60 req/min per token, 120/min per IP, 5 concurrent connections per token).
@@ -184,7 +184,7 @@ Optional:
 ## Programmatic Usage
 
 ```typescript
-import { createMcpServer } from '@aspereo/mcp-seatable'
+import { createMcpServer } from '@seatable/mcp-seatable'
 
 const server = await createMcpServer({
   serverUrl: 'https://your-seatable-server.com',
