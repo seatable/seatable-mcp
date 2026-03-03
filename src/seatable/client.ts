@@ -186,6 +186,7 @@ export class SeaTableClient {
             const res = await http.post('/rows/', {
                 table_name: table,
                 rows: [row],
+                convert_keys: true,
             })
             return res.data.first_row ?? res.data
         })
