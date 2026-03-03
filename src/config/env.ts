@@ -13,10 +13,8 @@ const EnvSchema = z
         SEATABLE_SERVER_URL: z.string().url(),
         SEATABLE_MODE: ServerModeSchema,
         SEATABLE_API_TOKEN: z.string().min(1).optional(),
-        SEATABLE_BASE_UUID: z.string().optional(),
         // Multi-base: comma-separated "Name:token" pairs, e.g. "CRM:token_abc,Projects:token_def"
         SEATABLE_BASES: z.string().optional(),
-        SEATABLE_TABLE_NAME: z.string().optional(),
         LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).optional(),
         HTTP_TIMEOUT_MS: z
             .string()
@@ -28,7 +26,6 @@ const EnvSchema = z
             .optional()
             .transform((v) => (v === '1' || v === 'true' ? true : false))
             .optional(),
-        SEATABLE_TOKEN_ENDPOINT_PATH: z.string().optional(),
         // Expiry string passed to app-access-token endpoint, e.g., '3d', '1h'
         SEATABLE_ACCESS_TOKEN_EXP: z.string().optional(),
         // Feature flags

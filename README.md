@@ -130,8 +130,6 @@ Authentication (one of these is required in selfhosted mode):
 Optional:
 
 - `SEATABLE_MODE` — `selfhosted` (default) or `managed` (multi-tenant HTTP with per-client auth)
-- `SEATABLE_BASE_UUID` — Base UUID (auto-detected from token exchange if omitted)
-- `SEATABLE_TABLE_NAME` — Default table name
 - `SEATABLE_MOCK=true` — Enable mock mode for offline testing
 - `SEATABLE_ACCESS_TOKEN_EXP` — Token expiry (default: `1h`)
 
@@ -239,7 +237,7 @@ node scripts/mcp-call.cjs list_rows '{"table": "Tasks", "page_size": 5}'
 | Issue | Solution |
 |---|---|
 | `Invalid API token` | Check `SEATABLE_API_TOKEN` |
-| `Base not found` | Verify `SEATABLE_BASE_UUID` or check token permissions |
+| `Base not found` | Check API token permissions |
 | `Connection timeout` | Check `SEATABLE_SERVER_URL` and network access |
 | `Permission denied` | Ensure API token has required base permissions |
 

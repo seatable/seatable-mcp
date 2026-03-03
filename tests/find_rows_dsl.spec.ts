@@ -5,7 +5,6 @@ import type { SeaTableRow } from '../src/seatable/types'
 beforeAll(() => {
   process.env.SEATABLE_SERVER_URL = 'http://localhost'
   process.env.SEATABLE_API_TOKEN = 'test-token'
-  process.env.SEATABLE_BASE_UUID = 'test-base'
 })
 
 describe('find_rows DSL evaluator', () => {

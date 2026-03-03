@@ -13,7 +13,6 @@ import { logAxiosError } from './utils.js'
 export interface SeaTableClientConfig {
     serverUrl: string
     apiToken: string
-    baseUuid?: string
     timeoutMs?: number
     accessTokenExp?: string
 }
@@ -34,17 +33,14 @@ export class SeaTableClient {
     private readonly tokenManager: TokenManager
     private readonly limiter: Bottleneck
     private readonly serverUrl: string
-    private readonly configuredBaseUuid?: string
     private readonly timeoutMs: number
 
     private http?: AxiosInstance
-    private baseUuid?: string
     private initialized = false
     private initializing?: Promise<void>
 
     constructor(config: SeaTableClientConfig) {
         this.serverUrl = config.serverUrl.replace(/\/$/, '')
-        this.configuredBaseUuid = config.baseUuid || undefined
         this.timeoutMs = config.timeoutMs ?? 30000
 
         this.tokenManager = new TokenManager({
@@ -71,15 +67,14 @@ export class SeaTableClient {
         // Trigger token exchange to get base token + dtable_uuid
         await this.tokenManager.getToken()
 
-        // Resolve base UUID: configured env takes priority, then from token exchange
-        this.baseUuid = this.configuredBaseUuid || this.tokenManager.getDtableUuid()
-        if (!this.baseUuid) {
+        const baseUuid = this.tokenManager.getDtableUuid()
+        if (!baseUuid) {
             throw new Error(
-                'Cannot determine base UUID. Either set SEATABLE_BASE_UUID or ensure the token exchange returns dtable_uuid.'
+                'Cannot determine base UUID. Ensure the token exchange returns dtable_uuid.'
             )
         }
 
-        const baseURL = `${this.serverUrl}/api-gateway/api/v2/dtables/${this.baseUuid}`
+        const baseURL = `${this.serverUrl}/api-gateway/api/v2/dtables/${baseUuid}`
         logger.info({ baseURL }, 'SeaTableClient initialized')
 
         this.http = axios.create({
@@ -297,7 +292,6 @@ export function createClientFromEnv(): SeaTableClient {
     return new SeaTableClient({
         serverUrl: env.SEATABLE_SERVER_URL,
         apiToken: env.SEATABLE_API_TOKEN,
-        baseUuid: env.SEATABLE_BASE_UUID,
         timeoutMs: env.HTTP_TIMEOUT_MS,
         accessTokenExp: env.SEATABLE_ACCESS_TOKEN_EXP,
     })

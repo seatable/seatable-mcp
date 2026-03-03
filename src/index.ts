@@ -15,8 +15,6 @@ export type { ServerMode } from './config/env.js'
 export interface McpServerConfig {
     serverUrl?: string
     apiToken?: string
-    baseUuid?: string
-    tableName?: string
     mock?: boolean
 }
 
@@ -26,8 +24,6 @@ export async function createMcpServer(config?: McpServerConfig) {
         const overrides: Record<string, string> = {}
         if (config.serverUrl) overrides.SEATABLE_SERVER_URL = config.serverUrl
         if (config.apiToken) overrides.SEATABLE_API_TOKEN = config.apiToken
-        if (config.baseUuid) overrides.SEATABLE_BASE_UUID = config.baseUuid
-        if (config.tableName) overrides.SEATABLE_TABLE_NAME = config.tableName
         if (config.mock !== undefined) overrides.SEATABLE_MOCK = config.mock ? '1' : '0'
 
         if (Object.keys(overrides).length > 0) {
