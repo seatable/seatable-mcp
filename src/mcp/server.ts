@@ -84,7 +84,7 @@ export class SeaTableMCPServer {
         this.server = new Server(
             {
                 name: '@aspereo/mcp-seatable',
-                version: '0.1.1',
+                version: '0.9.0',
             },
             {
                 capabilities: {

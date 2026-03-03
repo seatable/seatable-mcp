@@ -1,6 +1,8 @@
 # mcp-seatable
 
-A Model Context Protocol (MCP) server for SeaTable that exposes database capabilities (schema introspection, CRUD, querying, linking, select option management) through 19 tools. You can run it:
+> **Beta** — This project is under active development. APIs and configuration may change between releases.
+
+A Model Context Protocol (MCP) server for SeaTable that exposes database capabilities (schema introspection, CRUD, querying, linking, select option management) through 20 tools. You can run it:
 
 - As a local CLI (stdio) MCP server for direct IDE integration
 - As an HTTP server (Streamable HTTP transport) for network-accessible MCP
