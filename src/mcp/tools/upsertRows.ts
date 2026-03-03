@@ -17,7 +17,7 @@ export const registerUpsertRows: ToolRegistrar = (server, { client, getInputSche
         {
             title: 'Batch Upsert Rows',
             description:
-                'Batch upsert rows by matching on one or more key columns. If a match exists, update it; otherwise insert a new row. Rejects unknown columns.',
+                'Batch upsert rows by matching on one or more key columns. If a match exists, update it; otherwise insert a new row. Rejects unknown columns. Link and file/image columns cannot be set here — use link_rows/unlink_rows and upload_file instead.',
             inputSchema: getInputSchema(InputSchema),
         },
         async (args: unknown) => {

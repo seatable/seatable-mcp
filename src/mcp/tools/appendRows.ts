@@ -12,7 +12,7 @@ export const registerAppendRows: ToolRegistrar = (server, { client, getInputSche
         'append_rows',
         {
             title: 'Append Rows',
-            description: 'Batch insert rows.',
+            description: 'Batch insert rows. Link and file/image columns cannot be set here — use link_rows and upload_file instead.',
             inputSchema: getInputSchema(InputSchema),
         },
         async (args: unknown) => {

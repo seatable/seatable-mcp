@@ -43,6 +43,10 @@ export class ContextualClient implements ClientLike {
     // Collaborators
     listCollaborators() { return this.client.listCollaborators() }
 
+    // Links
+    createLinks(args: { table: string; linkColumn: string; pairs: Array<{ fromRowId: string; toRowId: string }> }) { return this.client.createLinks(args) }
+    deleteLinks(args: { table: string; linkColumn: string; pairs: Array<{ fromRowId: string; toRowId: string }> }) { return this.client.deleteLinks(args) }
+
     // File upload
     uploadFile(args: { table: string; column: string; rowId: string; fileName: string; fileData: string; replace?: boolean }) { return this.client.uploadFile(args) }
 }

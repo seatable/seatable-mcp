@@ -28,6 +28,10 @@ export interface ClientLike {
     // Collaborators
     listCollaborators(): Promise<Array<{ email: string; name: string }>>
 
+    // Links
+    createLinks(args: { table: string; linkColumn: string; pairs: Array<{ fromRowId: string; toRowId: string }> }): Promise<any>
+    deleteLinks(args: { table: string; linkColumn: string; pairs: Array<{ fromRowId: string; toRowId: string }> }): Promise<any>
+
     // File upload
     uploadFile(args: {
         table: string; column: string; rowId: string;

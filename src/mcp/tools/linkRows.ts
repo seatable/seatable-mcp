@@ -13,22 +13,19 @@ export const registerLinkRows: ToolRegistrar = (server, { client, getInputSchema
     'link_rows',
     {
       title: 'Link Rows',
-      description: 'Create links between rows by updating the link column with row IDs.',
+      description: 'Create links between rows via the dedicated links endpoint. This is the ONLY way to create links — link columns cannot be written via add_row or update_rows.',
       inputSchema: getInputSchema(InputSchema),
     },
     async (args: unknown) => {
       const { table, link_column, pairs } = InputSchema.parse(args)
-      const results: any[] = []
 
-      for (const { from_row_id, to_row_id } of pairs) {
-        const existing = await client.getRow(table, from_row_id)
-        const current = Array.isArray(existing[link_column]) ? (existing[link_column] as any[]) : []
-        const next = Array.from(new Set([...current, to_row_id]))
-        const updated = await client.updateRow(table, from_row_id, { [link_column]: next })
-        results.push({ from_row_id, to_row_id, row: updated })
-      }
+      const result = await client.createLinks({
+        table,
+        linkColumn: link_column,
+        pairs: pairs.map((p) => ({ fromRowId: p.from_row_id, toRowId: p.to_row_id })),
+      })
 
-      return { content: [{ type: 'text', text: JSON.stringify({ results }) }] }
+      return { content: [{ type: 'text', text: JSON.stringify(result) }] }
     }
   )
 }

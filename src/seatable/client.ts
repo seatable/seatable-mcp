@@ -235,6 +235,87 @@ export class SeaTableClient {
         })
     }
 
+    // --- Links ---
+
+    private async resolveLinkColumn(tableName: string, linkColumnName: string): Promise<{
+        link_id: string
+        table_id: string
+        other_table_id: string
+    }> {
+        const metadata = await this.getMetadata()
+        const tableObj = (metadata.tables ?? []).find((t: any) => t.name === tableName)
+        if (!tableObj) throw new Error(`Table "${tableName}" not found`)
+
+        const colObj = (tableObj.columns ?? []).find((c: any) => c.name === linkColumnName)
+        if (!colObj) throw new Error(`Column "${linkColumnName}" not found in table "${tableName}"`)
+        if (colObj.type !== 'link') {
+            throw new Error(`Column "${linkColumnName}" is type "${colObj.type}", expected "link"`)
+        }
+
+        const { link_id, table_id, other_table_id } = colObj.data
+        // If the user is linking from the "other" side, swap the IDs
+        if (tableObj._id === table_id) {
+            return { link_id, table_id, other_table_id }
+        }
+        return { link_id, table_id: other_table_id, other_table_id: table_id }
+    }
+
+    async createLinks(args: {
+        table: string
+        linkColumn: string
+        pairs: Array<{ fromRowId: string; toRowId: string }>
+    }): Promise<any> {
+        await this.ensureInitialized()
+        const { link_id, table_id, other_table_id } = await this.resolveLinkColumn(args.table, args.linkColumn)
+
+        // Group pairs into other_rows_ids_map
+        const map: Record<string, string[]> = {}
+        for (const { fromRowId, toRowId } of args.pairs) {
+            if (!map[fromRowId]) map[fromRowId] = []
+            map[fromRowId].push(toRowId)
+        }
+
+        return this.request('createLinks', async (http) => {
+            const res = await http.post('/links/', {
+                link_id,
+                table_id,
+                other_table_id,
+                other_rows_ids_map: map,
+            })
+            return res.data
+        })
+    }
+
+    async deleteLinks(args: {
+        table: string
+        linkColumn: string
+        pairs: Array<{ fromRowId: string; toRowId: string }>
+    }): Promise<any> {
+        await this.ensureInitialized()
+        const { link_id, table_id, other_table_id } = await this.resolveLinkColumn(args.table, args.linkColumn)
+
+        // Group pairs into other_rows_ids_map
+        const map: Record<string, string[]> = {}
+        for (const { fromRowId, toRowId } of args.pairs) {
+            if (!map[fromRowId]) map[fromRowId] = []
+            map[fromRowId].push(toRowId)
+        }
+
+        return this.request('deleteLinks', async (http) => {
+            const res = await http.delete('/links/', {
+                data: {
+                    link_id,
+                    table_id,
+                    other_table_id,
+                    other_rows_ids_map: map,
+                },
+            })
+            return res.data
+        })
+    }
+
+    // --- File upload ---
+
     async uploadFile(args: {
         table: string
         column: string

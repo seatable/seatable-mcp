@@ -101,6 +101,20 @@ export class MockSeaTableClient {
     ]
   }
 
+  async createLinks(args: {
+    table: string; linkColumn: string;
+    pairs: Array<{ fromRowId: string; toRowId: string }>
+  }): Promise<any> {
+    return { success: true }
+  }
+
+  async deleteLinks(args: {
+    table: string; linkColumn: string;
+    pairs: Array<{ fromRowId: string; toRowId: string }>
+  }): Promise<any> {
+    return { success: true }
+  }
+
   async uploadFile(args: {
     table: string; column: string; rowId: string;
     fileName: string; fileData: string; replace?: boolean
