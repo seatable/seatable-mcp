@@ -271,6 +271,9 @@ node scripts/mcp-call.cjs list_rows '{"table": "Tasks", "page_size": 5}'
 | `Base not found` | Check API token permissions |
 | `Connection timeout` | Check `SEATABLE_SERVER_URL` and network access |
 | `Permission denied` | Ensure API token has required base permissions |
+| `You don't have permission to perform this operation on this base.` | API token is read-only or row limit exceeded |
+| `Asset quota exceeded.` | Storage quota reached — delete files or upgrade plan |
+| `too many requests` | Rate-limited by SeaTable — requests are automatically retried with backoff (3 attempts) |
 
 ## License
 

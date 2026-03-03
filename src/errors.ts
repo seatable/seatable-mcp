@@ -25,7 +25,7 @@ export function toCodedAxiosError(error: unknown, op: string): CodedError {
   const err = error as AxiosError
   const status = err.response?.status
   const data = err.response?.data as any
-  const detail = data?.error_msg || data?.detail || ''
+  const detail = data?.error_msg || data?.error_message || data?.detail || ''
   const msg = (code: ErrorCode) => detail ? `${code}: ${detail}` : code
 
   if (status === 401) return makeError('ERR_AUTH_EXPIRED', msg('ERR_AUTH_EXPIRED'), { op, status, data })
