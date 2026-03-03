@@ -1,0 +1,39 @@
+services:
+  caddy:
+    image: lucaslorentz/caddy-docker-proxy:2.10.0-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/caddy:/data
+    networks:
+      - frontend-net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:2019/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  mcp-server:
+    build: .
+    labels:
+      caddy: ${SEATABLE_MCP_HOSTNAME}
+      caddy.reverse_proxy: "{{upstreams 3000}}"
+    environment:
+      - SEATABLE_SERVER_URL
+      - SEATABLE_API_TOKEN
+      - SEATABLE_BASES
+      - SEATABLE_MODE
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - frontend-net
+    restart: unless-stopped
+
+networks:
+  frontend-net:
