@@ -107,12 +107,11 @@ Clients pass their API token via `Authorization: Bearer <token>` on session init
 ### Docker
 
 ```bash
-docker build -t seatable-mcp .
 docker run -d --name seatable-mcp \
   -p 3000:3000 \
   -e SEATABLE_SERVER_URL=https://your-seatable-server.com \
   -e SEATABLE_API_TOKEN=your-api-token \
-  seatable-mcp
+  seatable/seatable-mcp:latest
 
 # Health check
 curl http://localhost:3000/health

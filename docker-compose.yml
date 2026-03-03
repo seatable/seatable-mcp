@@ -19,7 +19,7 @@ services:
 
   mcp-server:
     container_name: seatable-mcp
-    build: .
+    image: seatable/seatable-mcp:latest
     labels:
       caddy: ${SEATABLE_MCP_HOSTNAME}
       caddy.reverse_proxy: "{{upstreams 3000}}"
