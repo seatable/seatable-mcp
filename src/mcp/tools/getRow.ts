@@ -4,7 +4,7 @@ import { ToolRegistrar } from './types.js'
 
 const InputSchema = z.object({
     table: z.string(),
-    rowId: z.string(),
+    row_id: z.string().describe('Row ID (the _id field)'),
 })
 
 export const registerGetRow: ToolRegistrar = (server, { client, getInputSchema }) => {
@@ -17,7 +17,7 @@ export const registerGetRow: ToolRegistrar = (server, { client, getInputSchema }
         },
         async (args: unknown) => {
             const parsed = InputSchema.parse(args)
-            const res = await client.getRow(parsed.table, parsed.rowId)
+            const res = await client.getRow(parsed.table, parsed.row_id)
             return { content: [{ type: 'text', text: JSON.stringify(res) }] }
         }
     )

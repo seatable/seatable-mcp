@@ -67,6 +67,10 @@ export function validateRowsAgainstSchema(
                 validateDate(key, row[key])
             } else if (col.type === 'geolocation') {
                 validateGeolocation(key, row[key])
+            } else if (col.type === 'single_select') {
+                validateSingleSelect(key, row[key], col)
+            } else if (col.type === 'multi_select') {
+                validateMultiSelect(key, row[key], col)
             }
         }
     }
@@ -122,6 +126,57 @@ function validateDate(colName: string, value: unknown): void {
             `Column "${colName}": date must start with YYYY-MM-DD format, got "${value}".`,
             { column: colName, value }
         )
+    }
+}
+
+function getSelectOptions(col: GenericColumn): Set<string> {
+    const opts = col.options?.options as Array<{ name: string }> | undefined
+    if (!Array.isArray(opts)) return new Set()
+    return new Set(opts.map((o) => o.name))
+}
+
+function validateSingleSelect(colName: string, value: unknown, col: GenericColumn): void {
+    if (value == null || value === '') return
+    if (typeof value !== 'string') {
+        throw makeError('ERR_VALIDATION', `Column "${colName}": single-select value must be a string.`, {
+            column: colName,
+            value,
+        })
+    }
+    const valid = getSelectOptions(col)
+    if (valid.size > 0 && !valid.has(value)) {
+        throw makeError(
+            'ERR_VALIDATION',
+            `Column "${colName}": unknown option "${value}". Valid options: ${[...valid].join(', ')}`,
+            { column: colName, value, validOptions: [...valid] }
+        )
+    }
+}
+
+function validateMultiSelect(colName: string, value: unknown, col: GenericColumn): void {
+    if (value == null) return
+    if (!Array.isArray(value)) {
+        throw makeError('ERR_VALIDATION', `Column "${colName}": multi-select value must be an array.`, {
+            column: colName,
+            value,
+        })
+    }
+    const valid = getSelectOptions(col)
+    if (valid.size === 0) return
+    for (const item of value) {
+        if (typeof item !== 'string') {
+            throw makeError('ERR_VALIDATION', `Column "${colName}": multi-select values must be strings.`, {
+                column: colName,
+                value: item,
+            })
+        }
+        if (!valid.has(item)) {
+            throw makeError(
+                'ERR_VALIDATION',
+                `Column "${colName}": unknown option "${item}". Valid options: ${[...valid].join(', ')}`,
+                { column: colName, value: item, validOptions: [...valid] }
+            )
+        }
     }
 }
 

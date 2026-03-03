@@ -26,6 +26,8 @@ const schema: GenericSchema = {
         { id: 'col15', name: 'Link', type: 'link' },
         { id: 'col16', name: 'Stamp', type: 'datetime' },
         { id: 'col17', name: 'RatingDefault', type: 'rate' },
+        { id: 'col18', name: 'Status', type: 'single_select', options: { options: [{ name: 'open', id: '1' }, { name: 'closed', id: '2' }] } },
+        { id: 'col19', name: 'Tags', type: 'multi_select', options: { options: [{ name: 'urgent', id: '1' }, { name: 'low', id: '2' }] } },
       ],
     },
   ],
@@ -234,6 +236,67 @@ describe('validateRowsAgainstSchema', () => {
       // Some APIs might pass address strings
       const rows = [{ Title: 'A', Location: 'Berlin' }]
       validateRowsAgainstSchema(schema, 'Tasks', rows)
+    })
+  })
+
+  // Single-select validation
+  describe('single-select validation', () => {
+    it('accepts valid option', () => {
+      const rows = [{ Title: 'A', Status: 'open' }]
+      validateRowsAgainstSchema(schema, 'Tasks', rows)
+    })
+
+    it('accepts null', () => {
+      const rows = [{ Title: 'A', Status: null }]
+      validateRowsAgainstSchema(schema, 'Tasks', rows)
+    })
+
+    it('accepts empty string', () => {
+      const rows = [{ Title: 'A', Status: '' }]
+      validateRowsAgainstSchema(schema, 'Tasks', rows)
+    })
+
+    it('throws on unknown option', () => {
+      const rows = [{ Title: 'A', Status: 'invalid' }]
+      expect(() => validateRowsAgainstSchema(schema, 'Tasks', rows)).toThrowError('unknown option "invalid"')
+    })
+
+    it('shows valid options in error', () => {
+      const rows = [{ Title: 'A', Status: 'nope' }]
+      expect(() => validateRowsAgainstSchema(schema, 'Tasks', rows)).toThrowError('open, closed')
+    })
+
+    it('throws on non-string value', () => {
+      const rows = [{ Title: 'A', Status: 123 }]
+      expect(() => validateRowsAgainstSchema(schema, 'Tasks', rows)).toThrowError('must be a string')
+    })
+  })
+
+  // Multi-select validation
+  describe('multi-select validation', () => {
+    it('accepts valid options', () => {
+      const rows = [{ Title: 'A', Tags: ['urgent', 'low'] }]
+      validateRowsAgainstSchema(schema, 'Tasks', rows)
+    })
+
+    it('accepts null', () => {
+      const rows = [{ Title: 'A', Tags: null }]
+      validateRowsAgainstSchema(schema, 'Tasks', rows)
+    })
+
+    it('throws on non-array', () => {
+      const rows = [{ Title: 'A', Tags: 'urgent' }]
+      expect(() => validateRowsAgainstSchema(schema, 'Tasks', rows)).toThrowError('must be an array')
+    })
+
+    it('throws on unknown option in array', () => {
+      const rows = [{ Title: 'A', Tags: ['urgent', 'nonexistent'] }]
+      expect(() => validateRowsAgainstSchema(schema, 'Tasks', rows)).toThrowError('unknown option "nonexistent"')
+    })
+
+    it('throws on non-string items', () => {
+      const rows = [{ Title: 'A', Tags: [1, 2] }]
+      expect(() => validateRowsAgainstSchema(schema, 'Tasks', rows)).toThrowError('must be strings')
     })
   })
 })
