@@ -78,6 +78,30 @@ curl http://localhost:3001/health
 # MCP endpoint: POST/GET/DELETE http://localhost:3001/mcp
 ```
 
+### Multi-Base (Selfhosted)
+
+Serve multiple bases from a single process:
+
+```bash
+SEATABLE_SERVER_URL=https://your-seatable-server.com \
+SEATABLE_BASES="CRM:token_abc,Projects:token_def" \
+npx -y @aspereo/mcp-seatable
+```
+
+Each tool automatically gets a `base` parameter. Use `list_bases` to see available bases.
+
+### Managed Mode (Multi-Tenant HTTP)
+
+For hosting an MCP endpoint where each client authenticates with their own SeaTable API token:
+
+```bash
+SEATABLE_MODE=managed \
+SEATABLE_SERVER_URL=https://your-seatable-server.com \
+PORT=3000 npx -y @aspereo/mcp-seatable --sse
+```
+
+Clients pass their API token via `Authorization: Bearer <token>` on session initialization. The server validates the token against SeaTable and applies rate limits (60 req/min per token, 120/min per IP, 5 concurrent connections per token).
+
 ### Docker
 
 ```bash
@@ -97,10 +121,15 @@ curl http://localhost:3000/health
 Required:
 
 - `SEATABLE_SERVER_URL` — Your SeaTable server URL
-- `SEATABLE_API_TOKEN` — Your SeaTable API token
+
+Authentication (one of these is required in selfhosted mode):
+
+- `SEATABLE_API_TOKEN` — Single-base API token
+- `SEATABLE_BASES` — Multi-base: comma-separated `Name:token` pairs (e.g. `CRM:token_abc,Projects:token_def`)
 
 Optional:
 
+- `SEATABLE_MODE` — `selfhosted` (default) or `managed` (multi-tenant HTTP with per-client auth)
 - `SEATABLE_BASE_UUID` — Base UUID (auto-detected from token exchange if omitted)
 - `SEATABLE_TABLE_NAME` — Default table name
 - `SEATABLE_MOCK=true` — Enable mock mode for offline testing
@@ -133,6 +162,7 @@ Optional:
 
 ### Utilities
 
+- **`list_bases`** — List available bases (multi-base mode only)
 - **`ping_seatable`** — Health check with latency monitoring
 - **`attach_file_to_row`** — File attachment (stub)
 

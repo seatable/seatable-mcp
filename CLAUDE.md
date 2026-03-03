@@ -30,9 +30,11 @@ Test files live in `tests/` and use the `.spec.ts` suffix with Vitest.
 
 ## Environment Variables
 
-Required: `SEATABLE_SERVER_URL`, `SEATABLE_API_TOKEN`
+Required: `SEATABLE_SERVER_URL`
 
-Optional: `SEATABLE_BASE_UUID` (auto-detected from token exchange), `SEATABLE_TABLE_NAME`, `SEATABLE_MOCK=true` (offline mock), `SEATABLE_ENABLE_DEBUG_TOOLS=1` (enables `echo_args` tool), `SEATABLE_ACCESS_TOKEN_EXP`, `SEATABLE_TOKEN_ENDPOINT_PATH`
+Auth (one required in selfhosted): `SEATABLE_API_TOKEN` (single-base) or `SEATABLE_BASES` (multi-base, format `Name:token,Name:token`)
+
+Optional: `SEATABLE_MODE` (`selfhosted`|`managed`, default `selfhosted`), `SEATABLE_BASE_UUID` (auto-detected from token exchange), `SEATABLE_TABLE_NAME`, `SEATABLE_MOCK=true` (offline mock), `SEATABLE_ENABLE_DEBUG_TOOLS=1` (enables `echo_args` tool), `SEATABLE_ACCESS_TOKEN_EXP`, `SEATABLE_TOKEN_ENDPOINT_PATH`
 
 Copy `.env.example` to `.env` for local development.
 
@@ -40,7 +42,12 @@ Copy `.env.example` to `.env` for local development.
 
 ### Server
 
-`src/index.ts` → `src/mcp/server.ts`: Uses `@modelcontextprotocol/sdk` `Server` class. Supports stdio (default) and Streamable HTTP (`--sse` / `--http`) transports. 19 tools registered via shared registrars from `src/mcp/tools/`.
+`src/index.ts` → `src/mcp/server.ts`: Uses `@modelcontextprotocol/sdk` `Server` class. Supports stdio (default) and Streamable HTTP (`--sse` / `--http`) transports. 20 tools registered via shared registrars from `src/mcp/tools/`.
+
+### Modes
+
+- **Selfhosted** (default): Single API token from env, one client per process. Supports multi-base via `SEATABLE_BASES`.
+- **Managed** (`SEATABLE_MODE=managed`): HTTP-only, each client authenticates with their own Bearer token. Token validated against SeaTable (`src/auth/tokenValidator.ts`) with positive (5 min) / negative (1 min) cache. Rate limiting via `src/ratelimit/` (per-token, per-IP, global, concurrent connections).
 
 ### Tool Registration Pattern
 
@@ -49,7 +56,7 @@ Each tool in `src/mcp/tools/<toolName>.ts` exports a `register*` function accept
 ```typescript
 export type ToolRegistrar = (
   server: McpServerLike,
-  deps: { client: ClientLike; env: Env; getInputSchema: (schema: any) => any }
+  deps: { client: ClientLike; env: Env; getInputSchema: (schema: any) => any; baseNames?: string[] }
 ) => void
 ```
 
@@ -57,7 +64,11 @@ The server adapter in `server.ts` collects these registrations into an internal 
 
 ### SeaTable Client
 
-`src/seatable/client.ts` (`SeaTableClient`) uses a single Axios instance targeting `/api-gateway/api/v2/dtables/{base_uuid}/`. Lazy initialization: on first API call, performs token exchange and derives `base_uuid` (from env or token response). Rate limiting (5 RPS via `bottleneck`) and retry with exponential backoff (`axios-retry`).
+`src/seatable/client.ts` (`SeaTableClient`) takes an explicit `SeaTableClientConfig` and uses a single Axios instance targeting `/api-gateway/api/v2/dtables/{base_uuid}/`. Lazy initialization: on first API call, performs token exchange and derives `base_uuid` (from config or token response). Rate limiting (5 RPS via `bottleneck`) and retry with exponential backoff (`axios-retry`). Factory functions: `createClientFromEnv()` (selfhosted), `createClientFromToken()` (managed).
+
+### Multi-Base
+
+`ClientRegistry` (`src/seatable/clientRegistry.ts`) manages multiple `SeaTableClient` instances keyed by base name. `ContextualClient` (`src/seatable/contextualClient.ts`) implements `ClientLike` and proxies calls to the right client based on a `base` parameter. In multi-base mode, `handleCallTool()` extracts the `base` arg and `handleListTools()` injects it into every tool schema dynamically — no changes needed in individual tool files.
 
 ### Schema Utilities
 
