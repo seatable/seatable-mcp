@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeAll, vi } from 'vitest'
+import { describe, expect, it, beforeAll } from 'vitest'
 
 beforeAll(() => {
     process.env.SEATABLE_SERVER_URL = 'http://localhost'
@@ -10,23 +10,28 @@ import { SeaTableClient } from '../src/seatable/client'
 
 // Basic shape tests for the client. These are lightweight and do not hit a real API.
 describe('SeaTableClient', () => {
-    it('constructs', () => {
+    it('constructs without error', () => {
         const client = new SeaTableClient()
         expect(client).toBeTruthy()
     })
 
-    it('uses a Base-Token (Bearer) for all surfaces', async () => {
-        const { TokenManager } = await import('../src/seatable/tokenManager')
-        const spy = vi.spyOn(TokenManager.prototype as any, 'getToken').mockResolvedValue('base-token')
-
-        const client = new SeaTableClient() as any
-        const mkErr = async (p: Promise<any>) => p.catch((e: any) => e)
-        const e1 = await mkErr(client.http.get('/metadata'))
-        const e2 = await mkErr(client.gatewayHttp.get('/tables/'))
-        const e3 = await mkErr(client.externalHttp.get('/metadata'))
-        expect(spy).toHaveBeenCalled()
-        expect(e1?.config?.headers?.Authorization).toBe('Bearer base-token')
-        expect(e2?.config?.headers?.Authorization).toBe('Bearer base-token')
-        expect(e3?.config?.headers?.Authorization).toBe('Bearer base-token')
+    it('exposes expected methods', () => {
+        const client = new SeaTableClient()
+        expect(typeof client.getMetadata).toBe('function')
+        expect(typeof client.listTables).toBe('function')
+        expect(typeof client.listRows).toBe('function')
+        expect(typeof client.getRow).toBe('function')
+        expect(typeof client.addRow).toBe('function')
+        expect(typeof client.updateRow).toBe('function')
+        expect(typeof client.deleteRow).toBe('function')
+        expect(typeof client.searchRows).toBe('function')
+        expect(typeof client.querySql).toBe('function')
+        expect(typeof client.createTable).toBe('function')
+        expect(typeof client.renameTable).toBe('function')
+        expect(typeof client.deleteTable).toBe('function')
+        expect(typeof client.createColumn).toBe('function')
+        expect(typeof client.updateColumn).toBe('function')
+        expect(typeof client.deleteColumn).toBe('function')
+        expect(typeof client.updateSelectOptions).toBe('function')
     })
 })

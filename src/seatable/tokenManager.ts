@@ -6,6 +6,7 @@ import { logAxiosError } from './utils.js'
 export type TokenInfo = {
     token: string
     expiresAt: number // epoch ms
+    dtableUuid?: string
 }
 
 export class TokenManager {
@@ -16,7 +17,7 @@ export class TokenManager {
     private current?: TokenInfo
     private refreshing?: Promise<string>
 
-    constructor(opts: { serverUrl: string; apiToken: string; baseUuid: string; timeoutMs?: number }) {
+    constructor(opts: { serverUrl: string; apiToken: string; timeoutMs?: number }) {
         this.serverUrl = opts.serverUrl.replace(/\/$/, '')
         this.apiToken = opts.apiToken
         this.http = axios.create({ timeout: opts.timeoutMs ?? 15000 })
@@ -41,13 +42,19 @@ export class TokenManager {
         }
     }
 
+    /** Returns dtable_uuid from the last token exchange, or undefined if not yet fetched. */
+    getDtableUuid(): string | undefined {
+        return this.current?.dtableUuid
+    }
+
     private isExpired(info?: TokenInfo): boolean {
         if (!info) return true
         return Date.now() >= info.expiresAt
     }
 
-    private extractTokenAndExpiry(data: any): { token: string; expiresAt: number } {
+    private extractTokenAndExpiry(data: any): { token: string; expiresAt: number; dtableUuid?: string } {
         const token: string = data?.access_token || data?.token || ''
+        const dtableUuid: string | undefined = data?.dtable_uuid || undefined
         const now = Date.now()
         let expiresAt = now + 60 * 60 * 1000 // default 1h
         const seconds = data?.expires_in ?? data?.expire_in ?? data?.ttl ?? data?.exp
@@ -59,7 +66,7 @@ export class TokenManager {
         }
         // Renew 1 minute early
         expiresAt -= 60 * 1000
-        return { token, expiresAt }
+        return { token, expiresAt, dtableUuid }
     }
 
     private async fetchAppToken(): Promise<string> {
@@ -68,9 +75,9 @@ export class TokenManager {
         const url = `${this.serverUrl}/api/v2.1/dtable/app-access-token/?exp=${encodeURIComponent(expParam)}`
         try {
             const res = await this.http.get(url, { headers: { Authorization: `Bearer ${this.apiToken}` } })
-            const { token, expiresAt } = this.extractTokenAndExpiry(res.data)
+            const { token, expiresAt, dtableUuid } = this.extractTokenAndExpiry(res.data)
             if (!token) throw new Error('App token response missing access token')
-            this.current = { token, expiresAt }
+            this.current = { token, expiresAt, dtableUuid }
             return token
         } catch (err) {
             logAxiosError(err, 'token_exchange_app')

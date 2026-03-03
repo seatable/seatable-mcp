@@ -31,6 +31,8 @@ export interface ClientLike {
     searchRows(table: string, query: Record<string, unknown>): Promise<{ rows: any[]; page?: number; page_size?: number; total?: number }>
     // SQL
     querySql(sql: string, parameters?: any[]): Promise<{ metadata: any; results: any[] }>
+    // Select options
+    updateSelectOptions(table: string, column: string, options: any[], return_options?: boolean): Promise<any>
 }
 
 export type ToolRegistrar = (

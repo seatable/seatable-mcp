@@ -1,11 +1,15 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import axios from 'axios'
 
 import { TokenManager } from '../src/seatable/tokenManager.js'
 
 const serverUrl = 'http://localhost'
 const apiToken = 'api-token'
-const baseUuid = 'base-uuid'
+
+beforeAll(() => {
+  process.env.SEATABLE_SERVER_URL = serverUrl
+  process.env.SEATABLE_API_TOKEN = apiToken
+})
 
 describe('TokenManager', () => {
   beforeEach(() => {
@@ -16,7 +20,7 @@ describe('TokenManager', () => {
     const get = vi.fn().mockResolvedValue({ data: { access_token: 'base-token', expires_in: 3600 } })
     vi.spyOn(axios, 'create').mockReturnValue({ get } as any)
 
-    const tm = new TokenManager({ serverUrl, apiToken, baseUuid })
+    const tm = new TokenManager({ serverUrl, apiToken })
     const token = await tm.getToken()
     expect(token).toBe('base-token')
     expect(get).toHaveBeenCalled()
@@ -26,7 +30,7 @@ describe('TokenManager', () => {
     const get = vi.fn().mockResolvedValue({ data: { access_token: 'once', expires_in: 3600 } })
     vi.spyOn(axios, 'create').mockReturnValue({ get } as any)
 
-    const tm = new TokenManager({ serverUrl, apiToken, baseUuid })
+    const tm = new TokenManager({ serverUrl, apiToken })
     const a = await tm.getToken()
     const b = await tm.getToken()
     expect(a).toBe('once')
@@ -38,7 +42,24 @@ describe('TokenManager', () => {
     const get = vi.fn().mockRejectedValue({ response: { status: 500 } })
     vi.spyOn(axios, 'create').mockReturnValue({ get } as any)
 
-    const tm = new TokenManager({ serverUrl, apiToken, baseUuid })
+    const tm = new TokenManager({ serverUrl, apiToken })
     await expect(tm.getToken()).rejects.toThrow('Failed to fetch app-access-token')
+  })
+
+  it('extracts dtable_uuid from token exchange response', async () => {
+    const get = vi.fn().mockResolvedValue({
+      data: { access_token: 'base-token', expires_in: 3600, dtable_uuid: '650d8a0d-test' },
+    })
+    vi.spyOn(axios, 'create').mockReturnValue({ get } as any)
+
+    const tm = new TokenManager({ serverUrl, apiToken })
+    await tm.getToken()
+    expect(tm.getDtableUuid()).toBe('650d8a0d-test')
+  })
+
+  it('getDtableUuid returns undefined before first token exchange', () => {
+    vi.spyOn(axios, 'create').mockReturnValue({ get: vi.fn() } as any)
+    const tm = new TokenManager({ serverUrl, apiToken })
+    expect(tm.getDtableUuid()).toBeUndefined()
   })
 })

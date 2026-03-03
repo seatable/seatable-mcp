@@ -125,6 +125,10 @@ export class MockSeaTableClient {
     return this.listRows({ table, filter: query })
   }
 
+  async updateSelectOptions(_table: string, _column: string, options: any[]): Promise<any> {
+    return { success: true, options }
+  }
+
   async querySql(sql: string, parameters?: any[]): Promise<{ metadata: any; results: any[] }> {
     // Mock implementation - just return empty results for now
     return {

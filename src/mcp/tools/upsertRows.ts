@@ -9,7 +9,6 @@ const InputSchema = z.object({
     table: z.string(),
     key_columns: z.array(z.string()).min(1),
     rows: z.array(z.record(z.string(), z.any())).min(1),
-    allow_create_columns: z.boolean().optional(),
 })
 
 export const registerUpsertRows: ToolRegistrar = (server, { client, getInputSchema }) => {
@@ -17,18 +16,17 @@ export const registerUpsertRows: ToolRegistrar = (server, { client, getInputSche
         'upsert_rows',
         {
             title: 'Batch Upsert Rows',
-            description: 'Batch upsert rows by matching on one or more key columns. If a match exists, update it; otherwise insert a new row. Rejects unknown columns unless allow_create_columns=true.',
+            description:
+                'Batch upsert rows by matching on one or more key columns. If a match exists, update it; otherwise insert a new row. Rejects unknown columns.',
             inputSchema: getInputSchema(InputSchema),
         },
         async (args: unknown) => {
-            const { table, key_columns, rows, allow_create_columns } = InputSchema.parse(args)
+            const { table, key_columns, rows } = InputSchema.parse(args)
 
-            // Validate payload against schema and unknown column policy
+            // Validate payload against schema
             const metadata = await client.getMetadata()
             const generic = mapMetadataToGeneric(metadata)
-            validateRowsAgainstSchema(generic, table, rows, {
-                allowCreateColumns: allow_create_columns ?? false,
-            })
+            validateRowsAgainstSchema(generic, table, rows)
 
             const results: Array<{ action: 'inserted' | 'updated'; row: any }> = []
 
@@ -44,12 +42,14 @@ export const registerUpsertRows: ToolRegistrar = (server, { client, getInputSche
                 const filter: Record<string, unknown> = {}
                 for (const k of key_columns) filter[k] = row[k]
 
-                // Use dedicated filter endpoint to avoid GET /rows ignoring filter params
                 const found = await client.searchRows(table, filter)
                 const matches = (found.rows || []).slice(0, 2)
 
                 if (matches.length > 1) {
-                    throw makeError('ERR_UPSERT_AMBIGUOUS', 'Multiple matches for upsert key', { key_columns, filter })
+                    throw makeError('ERR_UPSERT_AMBIGUOUS', 'Multiple matches for upsert key', {
+                        key_columns,
+                        filter,
+                    })
                 }
 
                 if (matches.length === 1) {

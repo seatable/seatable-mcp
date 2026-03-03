@@ -8,7 +8,7 @@ if (typeof process !== 'undefined' && process.versions?.node) {
 const EnvSchema = z.object({
     SEATABLE_SERVER_URL: z.string().url(),
     SEATABLE_API_TOKEN: z.string().min(1),
-    SEATABLE_BASE_UUID: z.string().min(1),
+    SEATABLE_BASE_UUID: z.string().optional(),
     SEATABLE_TABLE_NAME: z.string().optional(),
     LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).optional(),
     HTTP_TIMEOUT_MS: z

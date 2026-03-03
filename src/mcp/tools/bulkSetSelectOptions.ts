@@ -43,7 +43,7 @@ export const registerBulkSetSelectOptions: ToolRegistrar = (server, { client, ge
           results.push({ column: u.column, skipped: true, reason: 'no matching option ids by name' })
           continue
         }
-        const res = await (client as any).updateSelectOptions(table, u.column, toUpdate)
+        const res = await client.updateSelectOptions(table, u.column, toUpdate)
         results.push({ column: u.column, result: res })
       }
 
