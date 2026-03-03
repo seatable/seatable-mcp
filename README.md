@@ -166,6 +166,7 @@ Optional:
 
 ### Utilities
 
+- **`add_select_options`** — Add new options to single-select or multi-select columns
 - **`ping_seatable`** — Health check with latency monitoring
 
 ## Supported Column Types
