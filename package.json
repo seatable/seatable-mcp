@@ -3,7 +3,7 @@
   "version": "0.9.1",
   "type": "module",
   "license": "MIT",
-  "description": "MCP server for SeaTable — read, write, search, link, and query data in your bases through 16 focused tools",
+  "description": "MCP server for SeaTable — read, write, search, link, and query data in your bases",
   "keywords": [
     "mcp",
     "model-context-protocol",
