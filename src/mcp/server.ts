@@ -179,7 +179,7 @@ export class SeaTableMCPServer {
         }
     }
 
-    private async handleCallTool(request: z.infer<typeof CallToolRequestSchema>): Promise<CallToolResult> {
+    private async handleCallTool(request: { params: { name: string; arguments?: Record<string, unknown>; _meta?: Record<string, unknown> } }): Promise<CallToolResult> {
         const toolName = request.params.name
         const tool = this.tools.get(toolName)
 
