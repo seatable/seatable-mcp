@@ -9,7 +9,7 @@ import {
 import { z } from 'zod'
 import { zodToJsonSchema } from 'zod-to-json-schema'
 
-import { getEnv, parseBases } from '../config/env.js'
+import { getEnv, parseBases, VERSION } from '../config/env.js'
 import { logger } from '../logger.js'
 import { createClientFromEnv, createClientFromToken,SeaTableClient } from '../seatable/client.js'
 import { ClientRegistry } from '../seatable/clientRegistry.js'
@@ -81,7 +81,7 @@ export class SeaTableMCPServer {
         this.server = new Server(
             {
                 name: '@seatable/mcp-seatable',
-                version: '0.9.0',
+                version: VERSION,
             },
             {
                 capabilities: {

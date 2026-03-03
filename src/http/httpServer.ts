@@ -4,7 +4,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 
 import { TokenValidator } from '../auth/tokenValidator.js'
-import { getEnv, type ServerMode } from '../config/env.js'
+import { getEnv, type ServerMode, VERSION } from '../config/env.js'
 import { logger } from '../logger.js'
 import { buildServer } from '../mcp/server.js'
 import { RateLimitManager } from '../ratelimit/index.js'
@@ -189,7 +189,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
         }
 
         if (req.method === 'GET' && url.pathname === '/health') {
-            res.writeHead(200, { 'content-type': 'text/plain' }).end('ok')
+            res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ status: 'ok', version: VERSION }))
             return
         }
 
