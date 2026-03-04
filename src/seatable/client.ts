@@ -25,6 +25,11 @@ const ListRowsQuerySchema = z.object({
 })
 export type ListRowsQuery = z.infer<typeof ListRowsQuerySchema>
 
+/** Escape backticks in SQL identifiers to prevent injection. */
+export function sanitizeIdentifier(name: string): string {
+    return name.replace(/`/g, '``')
+}
+
 export class SeaTableClient {
     private readonly tokenManager: TokenManager
     private readonly limiter: Bottleneck
@@ -194,15 +199,11 @@ export class SeaTableClient {
         })
     }
 
-    private sanitizeIdentifier(name: string): string {
-        return name.replace(/`/g, '``')
-    }
-
     async searchRows(table: string, query: Record<string, unknown>): Promise<ListRowsResponse> {
         // Build SQL WHERE clause from key-value pairs
-        const conditions = Object.entries(query).map(([col]) => `\`${this.sanitizeIdentifier(col)}\` = ?`)
+        const conditions = Object.entries(query).map(([col]) => `\`${sanitizeIdentifier(col)}\` = ?`)
         const values = Object.values(query)
-        const sql = `SELECT * FROM \`${this.sanitizeIdentifier(table)}\` WHERE ${conditions.join(' AND ')}`
+        const sql = `SELECT * FROM \`${sanitizeIdentifier(table)}\` WHERE ${conditions.join(' AND ')}`
         const result = await this.querySql(sql, values)
         return { rows: result.results as SeaTableRow[] }
     }
