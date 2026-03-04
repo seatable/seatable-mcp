@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { ToolRegistrar } from './types.js'
 
 const InputSchema = z.object({
-    table: z.string(),
+    table: z.string().describe('Target table name'),
     row_id: z.string().describe('Row ID (the _id field)'),
 })
 
@@ -14,6 +14,7 @@ export const registerGetRow: ToolRegistrar = (server, { client, getInputSchema }
             title: 'Get Row',
             description: 'Get a row by ID from a table',
             inputSchema: getInputSchema(InputSchema),
+            annotations: { readOnlyHint: true },
         },
         async (args: unknown) => {
             const parsed = InputSchema.parse(args)

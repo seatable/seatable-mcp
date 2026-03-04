@@ -6,9 +6,9 @@ import { validateRowsAgainstSchema } from '../../schema/validate.js'
 import { ToolRegistrar } from './types.js'
 
 const InputSchema = z.object({
-    table: z.string(),
-    key_columns: z.array(z.string()).min(1),
-    rows: z.array(z.record(z.string(), z.any())).min(1),
+    table: z.string().describe('Target table name'),
+    key_columns: z.array(z.string()).min(1).describe('Columns to match on for finding existing rows'),
+    rows: z.array(z.record(z.string(), z.any())).min(1).describe('Array of row objects (column name -> value)'),
 })
 
 export const registerUpsertRows: ToolRegistrar = (server, { client, getInputSchema }) => {
@@ -19,6 +19,7 @@ export const registerUpsertRows: ToolRegistrar = (server, { client, getInputSche
             description:
                 'Batch upsert rows by matching on one or more key columns. If a match exists, update it; otherwise insert a new row. Rejects unknown columns. Link and file/image columns cannot be set here — use link_rows/unlink_rows and upload_file instead.',
             inputSchema: getInputSchema(InputSchema),
+            annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
         },
         async (args: unknown) => {
             const { table, key_columns, rows } = InputSchema.parse(args)

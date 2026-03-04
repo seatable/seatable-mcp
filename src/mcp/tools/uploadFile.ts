@@ -18,6 +18,7 @@ export const registerUploadFile: ToolRegistrar = (server, { client, getInputSche
             title: 'Upload File',
             description: 'Upload a file or image to a row. Accepts base64-encoded file data and attaches it to the specified file or image column. By default appends to existing files; set replace=true to overwrite.',
             inputSchema: getInputSchema(InputSchema),
+            annotations: { readOnlyHint: false, destructiveHint: false },
         },
         async (args: unknown) => {
             const { table, column, row_id, file_name, file_data, replace } = InputSchema.parse(args)

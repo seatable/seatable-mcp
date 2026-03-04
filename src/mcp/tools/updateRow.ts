@@ -5,13 +5,13 @@ import { validateRowsAgainstSchema } from '../../schema/validate.js'
 import { ToolRegistrar } from './types.js'
 
 const UpdateItem = z.object({
-    row_id: z.string(),
-    values: z.record(z.any()),
+    row_id: z.string().describe('Row ID (_id field) to update'),
+    values: z.record(z.any()).describe('Column name -> new value pairs'),
 })
 
 const InputSchema = z.object({
-    table: z.string(),
-    updates: z.array(UpdateItem).min(1),
+    table: z.string().describe('Target table name'),
+    updates: z.array(UpdateItem).min(1).describe('Array of updates, each with row_id and values'),
 })
 
 export const registerUpdateRows: ToolRegistrar = (server, { client, getInputSchema }) => {
@@ -21,6 +21,7 @@ export const registerUpdateRows: ToolRegistrar = (server, { client, getInputSche
             title: 'Update Rows',
             description: 'Batch update rows. Rejects unknown columns. Link and file/image columns cannot be modified here — use link_rows/unlink_rows and upload_file instead.',
             inputSchema: getInputSchema(InputSchema),
+            annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
         },
         async (args: unknown) => {
             const { table, updates } = InputSchema.parse(args)

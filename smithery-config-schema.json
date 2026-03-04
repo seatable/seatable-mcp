@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "properties": {
+    "apiToken": {
+      "type": "string",
+      "title": "SeaTable API Token",
+      "description": "API token for your SeaTable base",
+      "x-from": { "header": "x-seatable-api-token" },
+      "x-to": { "header": "Authorization" }
+    }
+  },
+  "required": ["apiToken"]
+}

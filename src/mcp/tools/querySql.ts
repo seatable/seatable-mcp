@@ -3,8 +3,8 @@ import { z } from 'zod'
 import { ToolRegistrar } from './types.js'
 
 const InputSchema = z.object({
-    sql: z.string().refine(sql => sql.trim().length > 0, 'SQL query cannot be empty'),
-    parameters: z.array(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
+    sql: z.string().describe('SQL query (SELECT, INSERT, UPDATE, DELETE)').refine(sql => sql.trim().length > 0, 'SQL query cannot be empty'),
+    parameters: z.array(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional().describe('Values for ? placeholders in the SQL query'),
 })
 
 export const registerQuerySql: ToolRegistrar = (server, { client, getInputSchema }) => {
@@ -14,6 +14,7 @@ export const registerQuerySql: ToolRegistrar = (server, { client, getInputSchema
             title: 'Query SQL',
             description: 'Execute raw SQL queries against SeaTable. Supports SELECT, INSERT, UPDATE, DELETE. Use ? placeholders for parameters to prevent SQL injection.',
             inputSchema: getInputSchema(InputSchema),
+            annotations: { readOnlyHint: false },
         },
         async (args: unknown) => {
             const { sql, parameters } = InputSchema.parse(args)

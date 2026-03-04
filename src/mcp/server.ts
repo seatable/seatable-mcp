@@ -63,6 +63,7 @@ interface RegisteredTool {
     name: string
     description: string
     inputSchema: any
+    annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean; openWorldHint?: boolean }
     handler: (args: unknown) => Promise<CallToolResult>
 }
 
@@ -94,9 +95,9 @@ export class SeaTableMCPServer {
         this.initializeHandlers()
     }
 
-    getToolDefinitions(): Array<{ name: string; description: string; inputSchema: any }> {
-        return Array.from(this.tools.values()).map(({ name, description, inputSchema }) => ({
-            name, description, inputSchema,
+    getToolDefinitions(): Array<{ name: string; description: string; inputSchema: any; annotations?: RegisteredTool['annotations'] }> {
+        return Array.from(this.tools.values()).map(({ name, description, inputSchema, annotations }) => ({
+            name, description, inputSchema, ...(annotations && { annotations }),
         }))
     }
 
@@ -119,6 +120,7 @@ export class SeaTableMCPServer {
                     name,
                     description: config.description || config.title || name,
                     inputSchema: config.inputSchema,
+                    annotations: config.annotations,
                     handler,
                 })
             }
@@ -182,6 +184,7 @@ export class SeaTableMCPServer {
                     name: tool.name,
                     description: tool.description,
                     inputSchema: schema,
+                    ...(tool.annotations && { annotations: tool.annotations }),
                 }
             }),
         }

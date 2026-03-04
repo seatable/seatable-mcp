@@ -5,8 +5,8 @@ import { validateRowsAgainstSchema } from '../../schema/validate.js'
 import { ToolRegistrar } from './types.js'
 
 const InputSchema = z.object({
-    table: z.string(),
-    rows: z.array(z.record(z.string(), z.any())).min(1),
+    table: z.string().describe('Target table name'),
+    rows: z.array(z.record(z.string(), z.any())).min(1).describe('Array of row objects (column name -> value)'),
 })
 
 export const registerAppendRows: ToolRegistrar = (server, { client, getInputSchema }) => {
@@ -16,6 +16,7 @@ export const registerAppendRows: ToolRegistrar = (server, { client, getInputSche
             title: 'Append Rows',
             description: 'Batch insert rows. Rejects unknown columns. Link and file/image columns cannot be set here — use link_rows and upload_file instead.',
             inputSchema: getInputSchema(InputSchema),
+            annotations: { readOnlyHint: false, destructiveHint: false },
         },
         async (args: unknown) => {
             const { table, rows } = InputSchema.parse(args)

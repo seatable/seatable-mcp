@@ -15,6 +15,7 @@ export const registerListTables: ToolRegistrar = (server, { client, getInputSche
                 properties: {},
                 required: []
             },
+            annotations: { readOnlyHint: true },
         },
         async (_args: unknown) => {
             InputSchema.parse({})
