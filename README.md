@@ -154,6 +154,33 @@ Optional:
 
 - `SEATABLE_MODE` — `selfhosted` (default) or `managed` (multi-tenant HTTP with per-client auth)
 - `SEATABLE_MOCK=true` — Enable mock mode for offline testing
+- `METRICS_PORT` — Prometheus metrics port (default: `9090`, HTTP mode only)
+
+## Monitoring
+
+In HTTP mode, the server exposes Prometheus metrics on a separate port (default `9090`):
+
+```bash
+curl http://localhost:9090/metrics
+```
+
+Available metrics:
+
+| Metric | Type | Description |
+|---|---|---|
+| `mcp_tool_calls_total{tool, status}` | Counter | Tool calls by name and result (success/error) |
+| `mcp_tool_duration_seconds{tool}` | Histogram | Tool execution time |
+| `mcp_http_requests_total{method, status}` | Counter | HTTP requests by method and status code |
+| `mcp_rate_limit_exceeded_total{type}` | Counter | Rate limit rejections (global/per_ip/per_token) |
+| `mcp_auth_validations_total{result}` | Counter | Auth validations (success/failure/cache_hit) |
+| `mcp_active_sessions` | Gauge | Currently active HTTP sessions |
+| `mcp_active_connections` | Gauge | Currently active connections |
+| `seatable_api_requests_total{operation, status}` | Counter | SeaTable API calls by operation |
+| `seatable_api_duration_seconds{operation}` | Histogram | SeaTable API latency |
+
+Plus standard Node.js metrics (memory, CPU, event loop) via `prom-client`.
+
+The metrics server only starts in HTTP mode (not stdio) and binds to `0.0.0.0` — in Docker, expose the port only within your internal network.
 
 ## MCP Tools
 
