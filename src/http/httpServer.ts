@@ -6,7 +6,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { TokenValidator } from '../auth/tokenValidator.js'
 import { getEnv, type ServerMode, VERSION } from '../config/env.js'
 import { logger } from '../logger.js'
-import { buildServer } from '../mcp/server.js'
+import { buildServer, getStaticToolDefinitions } from '../mcp/server.js'
 import { RateLimitManager } from '../ratelimit/index.js'
 
 export interface StartHttpServerOptions {
@@ -51,6 +51,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
     const tokenValidator = mode === 'managed' ? new TokenValidator(env.SEATABLE_SERVER_URL) : undefined
     const rateLimiter = mode === 'managed' ? new RateLimitManager() : undefined
 
+    const toolDefinitions = getStaticToolDefinitions()
     const sessions = new Map<string, ActiveSession>()
 
     function extractBearerToken(req: IncomingMessage): string | undefined {
@@ -203,6 +204,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
                 serverInfo: { name: '@seatable/mcp-seatable', version: VERSION },
                 authentication: { required: true, schemes: ['bearer'] },
                 capabilities: { tools: true, resources: false, prompts: false },
+                tools: toolDefinitions,
             }
             res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(card))
             return

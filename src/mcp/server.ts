@@ -94,6 +94,12 @@ export class SeaTableMCPServer {
         this.initializeHandlers()
     }
 
+    getToolDefinitions(): Array<{ name: string; description: string; inputSchema: any }> {
+        return Array.from(this.tools.values()).map(({ name, description, inputSchema }) => ({
+            name, description, inputSchema,
+        }))
+    }
+
     async connect(transport: Transport): Promise<void> {
         await this.server.connect(transport)
     }
@@ -256,4 +262,9 @@ export function buildServer(options?: BuildServerOptions) {
     const server = new SeaTableMCPServer(client)
     logger.info('MCP server built')
     return server
+}
+
+/** Return tool definitions without needing a real SeaTable client. */
+export function getStaticToolDefinitions() {
+    return new SeaTableMCPServer({} as ClientLike).getToolDefinitions()
 }
