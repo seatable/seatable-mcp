@@ -2,7 +2,7 @@
 
 > **Beta** — This project is under active development. APIs and configuration may change between releases.
 
-The official Model Context Protocol (MCP) server for [SeaTable](https://seatable.io), built and maintained by SeaTable GmbH. It lets AI agents interact with data in your bases — reading, writing, searching, linking, and querying rows through 19 focused tools. The server intentionally focuses on data operations, not schema management (creating/deleting tables or columns), keeping the tool set lean and safe for autonomous agent use.
+The official Model Context Protocol (MCP) server for [SeaTable](https://seatable.com), built and maintained by SeaTable GmbH. It lets AI agents interact with data in your bases — reading, writing, searching, linking, and querying rows through a focused set of tools. The server intentionally focuses on data operations, not schema management (creating/deleting tables or columns), keeping the tool set lean and safe for autonomous agent use.
 
 ## Quick Start
 

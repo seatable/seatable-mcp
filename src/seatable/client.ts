@@ -314,29 +314,12 @@ export class SeaTableClient {
         options: Array<{ name: string; color?: string; textColor?: string }>
     }): Promise<any> {
         // SeaTable API requires both color and textColor on every option
-        const PALETTE = [
-            { color: '#FFDDA3', textColor: '#202020' },
-            { color: '#FF9F9F', textColor: '#202020' },
-            { color: '#EEE8F3', textColor: '#202020' },
-            { color: '#B3CEF3', textColor: '#202020' },
-            { color: '#D4EDDA', textColor: '#202020' },
-            { color: '#9F8CF1', textColor: '#202020' },
-            { color: '#7BC8F6', textColor: '#202020' },
-            { color: '#3BC97A', textColor: '#202020' },
-        ]
-        const hexLuminance = (hex: string) => {
-            const ch = (s: string) => parseInt(s, 16) / 255
-            const lin = (c: number) => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
-            const r = lin(ch(hex.slice(1, 3))), g = lin(ch(hex.slice(3, 5))), b = lin(ch(hex.slice(5, 7)))
-            return 0.2126 * r + 0.7152 * g + 0.0722 * b
-        }
-        const autoTextColor = (bg: string) => hexLuminance(bg) > 0.18 ? '#202020' : '#FFFFFF'
-        const options = args.options.map((opt) => {
-            const random = PALETTE[Math.floor(Math.random() * PALETTE.length)]
-            const color = opt.color ?? random.color
-            const textColor = opt.textColor ?? (opt.color ? autoTextColor(opt.color) : random.textColor)
-            return { name: opt.name, color, textColor }
-        })
+        const COLORS = ['#FFDDA3', '#FF9F9F', '#EEE8F3', '#B3CEF3', '#D4EDDA', '#D4C5F9', '#7BC8F6', '#3BC97A']
+        const options = args.options.map((opt) => ({
+            name: opt.name,
+            color: opt.color ?? COLORS[Math.floor(Math.random() * COLORS.length)],
+            textColor: opt.textColor ?? '#202020',
+        }))
         return this.request('addColumnOptions', async (http) => {
             const res = await http.post('/column-options/', {
                 table_name: args.table,
