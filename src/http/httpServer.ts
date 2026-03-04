@@ -158,7 +158,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
         if (sessionId) {
             const session = sessions.get(sessionId)
             if (!session) {
-                res.writeHead(404, { 'content-type': 'text/plain' }).end('Session not found')
+                res.writeHead(404, { 'content-type': 'text/plain' }).end('Session expired. Please reconnect to start a new session.')
                 return
             }
             await session.transport.handleRequest(req, res, body)
