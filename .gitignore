@@ -12,6 +12,9 @@ pnpm-debug.log*
 .vscode/
 .DS_Store
 
+# MCP Registry
+.mcpregistry_*
+
 .github/instructions/
 refactoring-doku
 *.yaml
