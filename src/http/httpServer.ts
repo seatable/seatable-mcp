@@ -56,8 +56,8 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
 
     function extractBearerToken(req: IncomingMessage): string | undefined {
         const auth = req.headers.authorization
-        if (!auth?.startsWith('Bearer ')) return undefined
-        return auth.slice(7)
+        if (!auth) return undefined
+        return auth.startsWith('Bearer ') ? auth.slice(7) : auth
     }
 
     function getClientIp(req: IncomingMessage): string {
