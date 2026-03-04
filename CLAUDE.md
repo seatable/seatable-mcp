@@ -25,7 +25,7 @@ npm run typecheck        # tsc --noEmit
 node scripts/mcp-call.cjs <tool_name> '<json_args>'
 ```
 
-Test files live in `tests/` and use the `.spec.ts` suffix with Vitest.
+Test files live in `tests/` and use the `.spec.ts` suffix with Vitest. `vitest.config.ts` sets `LOG_LEVEL=warn` to suppress info-level noise. Tests use `SEATABLE_MOCK=true` to run against the in-memory `MockSeaTableClient` without a real SeaTable server.
 
 ## Environment Variables
 
