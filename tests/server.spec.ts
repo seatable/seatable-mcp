@@ -1,6 +1,8 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 
 import { buildServer, getStaticToolDefinitions, SeaTableMCPServer } from '../src/mcp/server'
+import { registerEchoArgs } from '../src/mcp/tools/echoArgs'
+import { registerPingSeatable } from '../src/mcp/tools/pingSeatable'
 import type { ClientLike } from '../src/mcp/tools/types'
 import { MockSeaTableClient } from '../src/seatable/mockClient'
 
@@ -23,6 +25,16 @@ function callTool(server: SeaTableMCPServer, name: string, args?: Record<string,
 
 function listTools(server: SeaTableMCPServer) {
     return (server as any).handleListTools()
+}
+
+/** Simulate tool registration with/without debug flag */
+function getToolNames(debug: boolean): string[] {
+    const names: string[] = []
+    const adapter = { registerTool: (name: string) => { names.push(name) } }
+    const deps: any = { client: {}, env: { SEATABLE_ENABLE_DEBUG_TOOLS: debug }, getInputSchema: () => ({ type: 'object', additionalProperties: true }) }
+    registerPingSeatable(adapter as any, deps)
+    if (debug) registerEchoArgs(adapter as any, deps)
+    return names
 }
 
 describe('SeaTableMCPServer', () => {
@@ -88,6 +100,17 @@ describe('SeaTableMCPServer', () => {
         const listTablesTool = result.tools.find((t: any) => t.name === 'list_tables')
         expect(listTablesTool.inputSchema.properties).toHaveProperty('base')
         expect(listTablesTool.inputSchema.properties.base.enum).toEqual(['CRM', 'Projects'])
+    })
+
+    it('does not register echo_args when debug flag is disabled', () => {
+        const names = getToolNames(false)
+        expect(names).toContain('ping_seatable')
+        expect(names).not.toContain('echo_args')
+    })
+
+    it('registers echo_args when debug flag is enabled', () => {
+        const names = getToolNames(true)
+        expect(names).toContain('echo_args')
     })
 
     it('handleListTools in multi-base mode does NOT inject base into list_bases', async () => {
