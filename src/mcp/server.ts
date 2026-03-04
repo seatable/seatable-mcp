@@ -11,7 +11,7 @@ import { zodToJsonSchema } from 'zod-to-json-schema'
 
 import { getEnv, parseBases, VERSION } from '../config/env.js'
 import { logger } from '../logger.js'
-import { toolCallsTotal, toolDurationSeconds } from '../metrics/index.js'
+import { toolCallsByToolTotal, toolCallsTotal, toolDurationSeconds } from '../metrics/index.js'
 import { createClientFromEnv, createClientFromToken,SeaTableClient } from '../seatable/client.js'
 import { ClientRegistry } from '../seatable/clientRegistry.js'
 import { ContextualClient } from '../seatable/contextualClient.js'
@@ -205,6 +205,7 @@ export class SeaTableMCPServer {
         }
 
         const start = Date.now()
+        toolCallsByToolTotal.inc({ tool: toolName })
         try {
             // Multi-base: extract base param and set on contextual client
             if (this.contextualClient) {

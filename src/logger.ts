@@ -11,6 +11,11 @@ if (typeof process !== 'undefined' && process.versions?.node && !('WebSocketPair
         base: undefined,
         redact: ['req.headers.authorization', 'config.headers.Authorization'],
         timestamp: pino?.stdTimeFunctions?.isoTime,
+        formatters: {
+            level(label: string) {
+                return { level: label.toUpperCase() }
+            },
+        },
     }) as Logger
 } else {
     const createFallbackLogger = () => {

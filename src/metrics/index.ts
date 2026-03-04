@@ -14,6 +14,13 @@ export const toolCallsTotal = new Counter({
     registers: [register],
 })
 
+export const toolCallsByToolTotal = new Counter({
+    name: 'mcp_tool_calls_by_tool_total',
+    help: 'Total number of tool calls per tool (regardless of outcome)',
+    labelNames: ['tool'] as const,
+    registers: [register],
+})
+
 export const httpRequestsTotal = new Counter({
     name: 'mcp_http_requests_total',
     help: 'Total number of HTTP requests',

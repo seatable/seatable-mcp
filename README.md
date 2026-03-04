@@ -169,6 +169,7 @@ Available metrics:
 | Metric | Type | Description |
 |---|---|---|
 | `mcp_tool_calls_total{tool, status}` | Counter | Tool calls by name and result (success/error) |
+| `mcp_tool_calls_by_tool_total{tool}` | Counter | Total calls per tool (regardless of outcome) |
 | `mcp_tool_duration_seconds{tool}` | Histogram | Tool execution time |
 | `mcp_http_requests_total{method, status}` | Counter | HTTP requests by method and status code |
 | `mcp_rate_limit_exceeded_total{type}` | Counter | Rate limit rejections (global/per_ip/per_token) |
