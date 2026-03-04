@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { getEnv } from '../config/env.js'
 import { toCodedAxiosError } from '../errors.js'
 import { logger } from '../logger.js'
+import { seatableApiDurationSeconds, seatableApiRequestsTotal } from '../metrics/index.js'
 import { TokenManager } from './tokenManager.js'
 import { ListRowsResponse, SeaTableRow, SeaTableTable } from './types.js'
 import { logAxiosError } from './utils.js'
@@ -100,9 +101,17 @@ export class SeaTableClient {
     private async request<T>(op: string, fn: (http: AxiosInstance) => Promise<T>): Promise<T> {
         await this.ensureInitialized()
         return this.limiter.schedule(async () => {
+            const start = Date.now()
             try {
-                return await fn(this.http!)
+                const result = await fn(this.http!)
+                const durationSec = (Date.now() - start) / 1000
+                seatableApiRequestsTotal.inc({ operation: op, status: 'success' })
+                seatableApiDurationSeconds.observe({ operation: op }, durationSec)
+                return result
             } catch (err) {
+                const durationSec = (Date.now() - start) / 1000
+                seatableApiRequestsTotal.inc({ operation: op, status: 'error' })
+                seatableApiDurationSeconds.observe({ operation: op }, durationSec)
                 logAxiosError(err, op)
                 throw toCodedAxiosError(err, op)
             }

@@ -11,6 +11,7 @@ import { zodToJsonSchema } from 'zod-to-json-schema'
 
 import { getEnv, parseBases, VERSION } from '../config/env.js'
 import { logger } from '../logger.js'
+import { toolCallsTotal, toolDurationSeconds } from '../metrics/index.js'
 import { createClientFromEnv, createClientFromToken,SeaTableClient } from '../seatable/client.js'
 import { ClientRegistry } from '../seatable/clientRegistry.js'
 import { ContextualClient } from '../seatable/contextualClient.js'
@@ -195,12 +196,15 @@ export class SeaTableMCPServer {
         const tool = this.tools.get(toolName)
 
         if (!tool) {
+            logger.warn({ tool: toolName }, 'Unknown tool called')
+            toolCallsTotal.inc({ tool: toolName, status: 'not_found' })
             return {
                 content: [{ type: 'text', text: JSON.stringify(`Unknown tool: ${toolName}`) }],
                 isError: true,
             }
         }
 
+        const start = Date.now()
         try {
             // Multi-base: extract base param and set on contextual client
             if (this.contextualClient) {
@@ -208,8 +212,19 @@ export class SeaTableMCPServer {
                 const baseName = args?.base as string | undefined
                 this.contextualClient.setBase(baseName)
             }
-            return await tool.handler(request.params.arguments)
+            const result = await tool.handler(request.params.arguments)
+            const durationMs = Date.now() - start
+            const durationSec = durationMs / 1000
+            logger.info({ tool: toolName, duration_ms: durationMs }, 'Tool call completed')
+            toolCallsTotal.inc({ tool: toolName, status: 'success' })
+            toolDurationSeconds.observe({ tool: toolName }, durationSec)
+            return result
         } catch (error) {
+            const durationMs = Date.now() - start
+            const durationSec = durationMs / 1000
+            logger.error({ tool: toolName, duration_ms: durationMs, err: error }, 'Tool call failed')
+            toolCallsTotal.inc({ tool: toolName, status: 'error' })
+            toolDurationSeconds.observe({ tool: toolName }, durationSec)
             return {
                 content: [{
                     type: 'text',

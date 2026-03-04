@@ -13,21 +13,24 @@ export function logAxiosError(error: unknown, op: string) {
     const meta = cfg.metadata || {}
     const started = meta.startedAt as number | undefined
     const duration = started ? Date.now() - started : undefined
-    logger.error(
-        {
-            op,
-            method: cfg.method,
-            url: cfg.url,
-            base_url: cfg.baseURL,
-            status: err.response?.status,
-            data: err.response?.data,
-            request_id: meta.requestId,
-            duration_ms: duration,
-            error_code: (err as any).code,
-            error_message: err.message,
-        },
-        'SeaTable API request failed'
-    )
+    const details = {
+        op,
+        method: cfg.method,
+        url: cfg.url,
+        base_url: cfg.baseURL,
+        status: err.response?.status,
+        data: err.response?.data,
+        request_id: meta.requestId,
+        duration_ms: duration,
+        error_code: (err as any).code,
+        error_message: err.message,
+    }
+    const status = err.response?.status ?? 0
+    if (status >= 400 && status < 500) {
+        logger.warn(details, 'SeaTable API request failed')
+    } else {
+        logger.error(details, 'SeaTable API request failed')
+    }
 }
 
 export interface PaginationOpts {

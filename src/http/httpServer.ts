@@ -7,6 +7,8 @@ import { TokenValidator } from '../auth/tokenValidator.js'
 import { getEnv, type ServerMode, VERSION } from '../config/env.js'
 import { logger } from '../logger.js'
 import { buildServer, getStaticToolDefinitions } from '../mcp/server.js'
+import { activeConnections, activeSessions, httpRequestsTotal } from '../metrics/index.js'
+import { startMetricsServer } from '../metrics/metricsServer.js'
 import { RateLimitManager } from '../ratelimit/index.js'
 
 export interface StartHttpServerOptions {
@@ -74,6 +76,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
             const token = sessionId_ ? sessions.get(sessionId_)?.apiToken : undefined
             const result = rateLimiter.check({ ip, token })
             if (!result.allowed) {
+                logger.warn({ ip, reason: result.reason }, 'Rate limit exceeded')
                 const retryAfter = Math.ceil(result.retryAfterMs / 1000)
                 res.writeHead(429, {
                     'content-type': 'text/plain',
@@ -96,11 +99,13 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
             if (mode === 'managed') {
                 apiToken = extractBearerToken(req)
                 if (!apiToken) {
+                    logger.warn({ ip: getClientIp(req) }, 'Missing Authorization header')
                     res.writeHead(401, { 'content-type': 'text/plain' }).end('Missing Authorization header')
                     return
                 }
                 const valid = await tokenValidator!.validate(apiToken)
                 if (!valid) {
+                    logger.warn({ ip: getClientIp(req) }, 'Invalid API token')
                     res.writeHead(401, { 'content-type': 'text/plain' }).end('Invalid API token')
                     return
                 }
@@ -109,9 +114,11 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
             // Connection limit (managed mode)
             if (rateLimiter && apiToken) {
                 if (!rateLimiter.connections.acquire(apiToken)) {
+                    logger.warn({ ip: getClientIp(req) }, 'Connection limit exceeded')
                     res.writeHead(429, { 'content-type': 'text/plain' }).end('Too many concurrent connections')
                     return
                 }
+                activeConnections.inc()
             }
 
             const mcpServer = buildServer(apiToken ? { apiToken } : undefined)
@@ -120,6 +127,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
                 onsessioninitialized: (id) => {
                     logger.info({ sessionId: id }, 'Streamable HTTP session initialized')
                     sessions.set(id, { transport, apiToken, close: cleanup })
+                    activeSessions.inc()
                 },
             })
 
@@ -127,8 +135,10 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
             const cleanup = async () => {
                 if (cleaned) return
                 cleaned = true
+                activeSessions.dec()
                 if (apiToken && rateLimiter) {
                     rateLimiter.connections.release(apiToken)
+                    activeConnections.dec()
                 }
                 if (transport.sessionId) {
                     sessions.delete(transport.sessionId)
@@ -158,6 +168,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
         if (sessionId) {
             const session = sessions.get(sessionId)
             if (!session) {
+                logger.debug({ sessionId }, 'Session not found')
                 res.writeHead(404, { 'content-type': 'text/plain' }).end('Session expired. Please reconnect to start a new session.')
                 return
             }
@@ -170,6 +181,10 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
     }
 
     const server = createServer(async (req, res) => {
+        res.on('finish', () => {
+            httpRequestsTotal.inc({ method: req.method ?? 'UNKNOWN', status: String(res.statusCode) })
+        })
+
         if (!req.url) {
             res.writeHead(400, { 'content-type': 'text/plain' }).end('Missing request URL')
             return
@@ -220,6 +235,9 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
     })
 
     logger.info({ host, port, endpoint: '/mcp' }, 'Streamable HTTP server listening')
+
+    // Start Prometheus metrics server on a separate port
+    await startMetricsServer()
 
     const shutdown = async () => {
         tokenValidator?.destroy()

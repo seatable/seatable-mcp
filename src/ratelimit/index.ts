@@ -1,3 +1,5 @@
+import { logger } from '../logger.js'
+import { rateLimitExceededTotal } from '../metrics/index.js'
 import { ConnectionCounter } from './connectionCounter.js'
 import { SlidingWindowLimiter } from './rateLimiter.js'
 
@@ -35,12 +37,16 @@ export class RateLimitManager {
         // Global limit
         const globalResult = this.global.check('global')
         if (!globalResult.allowed) {
+            logger.warn({ type: 'global', ip: opts.ip }, 'Rate limit exceeded')
+            rateLimitExceededTotal.inc({ type: 'global' })
             return { allowed: false, retryAfterMs: globalResult.retryAfterMs, reason: 'Global rate limit exceeded' }
         }
 
         // Per-IP limit
         const ipResult = this.perIp.check(opts.ip)
         if (!ipResult.allowed) {
+            logger.warn({ type: 'per_ip', ip: opts.ip }, 'Rate limit exceeded')
+            rateLimitExceededTotal.inc({ type: 'per_ip' })
             return { allowed: false, retryAfterMs: ipResult.retryAfterMs, reason: 'IP rate limit exceeded' }
         }
 
@@ -48,6 +54,8 @@ export class RateLimitManager {
         if (opts.token) {
             const tokenResult = this.perToken.check(opts.token)
             if (!tokenResult.allowed) {
+                logger.warn({ type: 'per_token', ip: opts.ip }, 'Rate limit exceeded')
+                rateLimitExceededTotal.inc({ type: 'per_token' })
                 return { allowed: false, retryAfterMs: tokenResult.retryAfterMs, reason: 'Token rate limit exceeded' }
             }
         }

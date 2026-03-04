@@ -3,6 +3,7 @@
   "version": "0.9.6",
   "type": "module",
   "license": "MIT",
+  "mcpName": "io.github.seatable/seatable",
   "description": "MCP server for SeaTable — read, write, search, link, and query data in your bases",
   "keywords": [
     "mcp",
@@ -57,7 +58,8 @@
     "format": "prettier --check .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "setup:hooks": "git config core.hooksPath .githooks",
-    "prepublishOnly": "npm run build && npm run test && npm run lint",
+    "sync:version": "node scripts/sync-server-json.cjs",
+    "prepublishOnly": "npm run sync:version && npm run build && npm run test && npm run lint",
     "prepare": "npm run build",
     "schemas:snapshot": "tsx scripts/snapshot-schemas.ts",
     "parity:test": "tsx scripts/transport-parity.ts"
@@ -72,6 +74,7 @@
     "bottleneck": "^2.19.5",
     "dotenv": "^16.4.5",
     "pino": "^9.4.0",
+    "prom-client": "^15.1.3",
     "zod": "^3.23.8",
     "zod-to-json-schema": "^3.24.6"
   },

@@ -1,6 +1,7 @@
 import axios from 'axios'
 
 import { logger } from '../logger.js'
+import { authValidationsTotal } from '../metrics/index.js'
 
 interface CacheEntry {
     valid: boolean
@@ -27,6 +28,8 @@ export class TokenValidator {
     async validate(apiToken: string): Promise<boolean> {
         const cached = this.cache.get(apiToken)
         if (cached && Date.now() < cached.expiresAt) {
+            logger.debug({ cached: cached.valid }, 'Token validation cache hit')
+            authValidationsTotal.inc({ result: 'cache_hit' })
             return cached.valid
         }
 
@@ -38,11 +41,13 @@ export class TokenValidator {
             })
             const valid = !!res.data?.access_token
             this.cache.set(apiToken, { valid, expiresAt: Date.now() + POSITIVE_TTL_MS })
+            authValidationsTotal.inc({ result: 'success' })
             return valid
         } catch (err: any) {
             const status = err?.response?.status
-            logger.debug({ status }, 'Token validation failed')
+            logger.warn({ status }, 'Token validation failed')
             this.cache.set(apiToken, { valid: false, expiresAt: Date.now() + NEGATIVE_TTL_MS })
+            authValidationsTotal.inc({ result: 'failure' })
             return false
         }
     }
