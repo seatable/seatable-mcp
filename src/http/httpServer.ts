@@ -208,7 +208,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
             return
         }
 
-        res.writeHead(404, { 'content-type': 'text/plain' }).end('Not found')
+        res.writeHead(404, { 'content-type': 'application/json' }).end(JSON.stringify({ error: 'Not found' }))
     })
 
     await new Promise<void>((resolve, reject) => {
