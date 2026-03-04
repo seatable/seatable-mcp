@@ -139,6 +139,20 @@ docker run -d --name seatable-mcp \
 curl http://localhost:3000/health
 ```
 
+### Security Model
+
+The security characteristics differ significantly between transport modes:
+
+| | stdio (default) | Selfhosted HTTP | Managed HTTP |
+|---|---|---|---|
+| **Network exposure** | None (local process) | TCP port, **no auth** | TCP port, Bearer auth |
+| **Authentication** | Not needed (local) | None | Per-session token validated against SeaTable |
+| **Rate limiting** | None | None | Per-token, per-IP, global |
+| **Connection limits** | N/A | None | 5 concurrent sessions per token |
+| **Data scope** | All configured bases | All configured bases | One base per client token |
+
+> **⚠️ Warning:** Selfhosted HTTP mode (`--sse` / `--http`) has **no authentication**. Anyone who can reach the port gets full access to all configured bases, including write and delete operations. Only run it in trusted networks (localhost, Docker-internal) or behind a reverse proxy that handles authentication. For untrusted networks, use **managed mode** instead.
+
 ## Environment Variables
 
 Required:

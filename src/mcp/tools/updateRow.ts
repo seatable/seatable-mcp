@@ -11,7 +11,7 @@ const UpdateItem = z.object({
 
 const InputSchema = z.object({
     table: z.string().describe('Target table name'),
-    updates: z.array(UpdateItem).min(1).describe('Array of updates, each with row_id and values'),
+    updates: z.array(UpdateItem).min(1).max(100).describe('Array of updates, each with row_id and values'),
 })
 
 export const registerUpdateRows: ToolRegistrar = (server, { client, getInputSchema }) => {

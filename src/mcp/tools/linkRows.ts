@@ -5,7 +5,7 @@ import { ToolRegistrar } from './types.js'
 const InputSchema = z.object({
   table: z.string().describe('Source table name'),
   link_column: z.string().describe('Name of the link column'),
-  pairs: z.array(z.object({ from_row_id: z.string().describe('Row ID in source table'), to_row_id: z.string().describe('Row ID in linked table') })).min(1).describe('Array of row ID pairs to link'),
+  pairs: z.array(z.object({ from_row_id: z.string().describe('Row ID in source table'), to_row_id: z.string().describe('Row ID in linked table') })).min(1).max(100).describe('Array of row ID pairs to link'),
 })
 
 export const registerLinkRows: ToolRegistrar = (server, { client, getInputSchema }) => {

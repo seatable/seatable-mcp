@@ -4,7 +4,7 @@ import { ToolRegistrar } from './types.js'
 
 const InputSchema = z.object({
     table: z.string().describe('Target table name'),
-    row_ids: z.array(z.string()).min(1).describe('List of row IDs (_id field) to delete'),
+    row_ids: z.array(z.string()).min(1).max(100).describe('List of row IDs (_id field) to delete'),
 })
 
 export const registerDeleteRows: ToolRegistrar = (server, { client, getInputSchema }) => {

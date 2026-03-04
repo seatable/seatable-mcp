@@ -22,11 +22,21 @@ type ActiveSession = {
     close: () => Promise<void>
 }
 
+const MAX_BODY_SIZE = 10 * 1024 * 1024 // 10 MB
+
 async function parseJsonBody(req: IncomingMessage): Promise<unknown> {
     return await new Promise((resolve, reject) => {
         const chunks: Buffer[] = []
+        let totalSize = 0
         req.on('data', (chunk) => {
-            chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk)
+            const buf = typeof chunk === 'string' ? Buffer.from(chunk) : chunk
+            totalSize += buf.length
+            if (totalSize > MAX_BODY_SIZE) {
+                req.destroy()
+                reject(new Error('Request body too large'))
+                return
+            }
+            chunks.push(buf)
         })
         req.on('end', () => {
             if (!chunks.length) {
