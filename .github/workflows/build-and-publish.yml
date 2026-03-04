@@ -126,3 +126,38 @@ jobs:
           ignore-unfixed: true
           vuln-type: "os,library"
           severity: "CRITICAL,HIGH"
+
+  # npm publish — only on release tags
+  publish-npm:
+    if: startsWith(github.ref, 'refs/tags/release-v')
+    runs-on: ubuntu-latest
+    needs: [lint-and-test, init-vars]
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+          cache: "npm"
+      - name: Install dependencies
+        run: npm ci
+      - name: Verify version matches tag
+        run: |
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          TAG_VERSION="${{ needs.init-vars.outputs.version }}"
+          if [[ "$PKG_VERSION" != "$TAG_VERSION" ]]; then
+            echo "::error::package.json version ($PKG_VERSION) does not match tag version ($TAG_VERSION)"
+            exit 1
+          fi
+      - name: Sync server.json version
+        run: npm run sync:version
+      - name: Build
+        run: npm run build
+      - name: Publish to npm
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.seatable/seatable",
+  "description": "MCP server for SeaTable — read, write, search, link, and query data in your bases",
+  "repository": {
+    "url": "https://github.com/seatable/seatable-mcp",
+    "source": "github"
+  },
+  "version": "0.9.6",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@seatable/mcp-seatable",
+      "version": "0.9.6",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "SEATABLE_SERVER_URL",
+          "description": "URL of your SeaTable server (e.g. https://cloud.seatable.io)",
+          "required": true
+        },
+        {
+          "name": "SEATABLE_API_TOKEN",
+          "description": "API token for a single SeaTable base",
+          "required": true
+        }
+      ]
+    }
+  ]
+}
