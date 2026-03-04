@@ -60,7 +60,7 @@
     "setup:hooks": "git config core.hooksPath .githooks",
     "sync:version": "node scripts/sync-server-json.cjs",
     "prepublishOnly": "npm run sync:version && npm run build && npm run test && npm run lint",
-    "prepare": "npm run build",
+    "prepare": "npm run sync:version && npm run build",
     "schemas:snapshot": "tsx scripts/snapshot-schemas.ts",
     "parity:test": "tsx scripts/transport-parity.ts"
   },

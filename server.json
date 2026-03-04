@@ -6,12 +6,12 @@
     "url": "https://github.com/seatable/seatable-mcp",
     "source": "github"
   },
-  "version": "0.9.6",
+  "version": "0.9.8",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@seatable/mcp-seatable",
-      "version": "0.9.6",
+      "version": "0.9.8",
       "transport": {
         "type": "stdio"
       },
