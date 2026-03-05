@@ -156,8 +156,10 @@ jobs:
             echo "::error::package.json version ($PKG_VERSION) does not match tag version ($TAG_VERSION)"
             exit 1
           fi
-      - name: Sync server.json version
-        run: npm run sync:version
+      - name: Patch server.json version
+        run: |
+          jq --arg v "${{ needs.init-vars.outputs.version }}" \
+            '.version = $v | .packages[].version = $v' server.json > tmp.json && mv tmp.json server.json
       - name: Build
         run: npm run build
       - name: Publish to npm
