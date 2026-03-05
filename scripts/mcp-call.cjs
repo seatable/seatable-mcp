@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+/**
+ * Manual tool tester — calls a single MCP tool via stdio and prints the result.
+ * Usage: node scripts/mcp-call.cjs <tool_name> '<json_args>'
+ * Example: node scripts/mcp-call.cjs list_tables '{}'
+ */
 const { spawn } = require('child_process');
 const readline = require('readline');
 
