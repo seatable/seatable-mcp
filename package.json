@@ -1,6 +1,6 @@
 {
   "name": "@seatable/mcp-seatable",
-  "version": "0.9.9",
+  "version": "1.0.0",
   "type": "module",
   "license": "MIT",
   "mcpName": "io.github.seatable/seatable",
