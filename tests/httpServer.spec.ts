@@ -1,6 +1,6 @@
 import type { AddressInfo } from 'node:net'
 
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Mock the metrics server to avoid port conflicts in tests
 vi.mock('../src/metrics/metricsServer', () => ({
@@ -147,5 +147,85 @@ describe('HTTP Server', () => {
             // Connection destroyed by server — expected behavior
             expect(true).toBe(true)
         }
+    })
+})
+
+describe('Session idle timeout', () => {
+    let idleServer: ReturnType<typeof import('node:http').createServer>
+    let idleBaseUrl: string
+
+    beforeEach(async () => {
+        idleServer = await startHttpServer({
+            port: 0,
+            sessionIdleTimeoutMs: 200,
+            sessionCheckIntervalMs: 50,
+        })
+        const addr = idleServer.address() as AddressInfo
+        idleBaseUrl = `http://127.0.0.1:${addr.port}`
+    })
+
+    afterEach(async () => {
+        if (idleServer) {
+            await new Promise<void>((resolve) => idleServer.close(() => resolve()))
+        }
+    })
+
+    it('closes idle sessions after timeout', async () => {
+        // Create a session
+        const initRes = await fetch(`${idleBaseUrl}/mcp`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'accept': 'application/json, text/event-stream',
+            },
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'initialize',
+                params: {
+                    protocolVersion: '2025-03-26',
+                    capabilities: {},
+                    clientInfo: { name: 'test', version: '1.0' },
+                },
+            }),
+        })
+        const sessionId = initRes.headers.get('mcp-session-id')
+        expect(sessionId).toBeTruthy()
+
+        // Session should be valid immediately
+        const res1 = await fetch(`${idleBaseUrl}/mcp`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'accept': 'application/json, text/event-stream',
+                'mcp-session-id': sessionId!,
+            },
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 2,
+                method: 'tools/list',
+                params: {},
+            }),
+        })
+        expect(res1.status).toBe(200)
+
+        // Wait for idle timeout + check interval to pass
+        await new Promise((r) => setTimeout(r, 350))
+
+        // Session should now be gone
+        const res2 = await fetch(`${idleBaseUrl}/mcp`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                'mcp-session-id': sessionId!,
+            },
+            body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 3,
+                method: 'tools/list',
+                params: {},
+            }),
+        })
+        expect(res2.status).toBe(404)
     })
 })

@@ -14,11 +14,16 @@ import { RateLimitManager } from '../ratelimit/index.js'
 export interface StartHttpServerOptions {
     host?: string
     port?: number
+    /** Session idle timeout in ms (default: 10 minutes) */
+    sessionIdleTimeoutMs?: number
+    /** Interval for checking idle sessions in ms (default: 60 seconds) */
+    sessionCheckIntervalMs?: number
 }
 
 type ActiveSession = {
     transport: StreamableHTTPServerTransport
     apiToken?: string
+    lastActivity: number
     close: () => Promise<void>
 }
 
@@ -136,7 +141,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
                 sessionIdGenerator: () => randomUUID(),
                 onsessioninitialized: (id) => {
                     logger.info({ sessionId: id }, 'Streamable HTTP session initialized')
-                    sessions.set(id, { transport, apiToken, close: cleanup })
+                    sessions.set(id, { transport, apiToken, lastActivity: Date.now(), close: cleanup })
                     activeSessions.inc()
                 },
             })
@@ -182,6 +187,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
                 res.writeHead(404, { 'content-type': 'text/plain' }).end('Session expired. Please reconnect to start a new session.')
                 return
             }
+            session.lastActivity = Date.now()
             await session.transport.handleRequest(req, res, body)
             return
         }
@@ -246,10 +252,24 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
 
     logger.info({ host, port, endpoint: '/mcp' }, 'Streamable HTTP server listening')
 
+    // Idle session cleanup
+    const sessionIdleTimeoutMs = options.sessionIdleTimeoutMs ?? 10 * 60 * 1000
+    const sessionCheckIntervalMs = options.sessionCheckIntervalMs ?? 60 * 1000
+    const idleCheckInterval = setInterval(() => {
+        const now = Date.now()
+        for (const [sessionId, session] of sessions.entries()) {
+            if (now - session.lastActivity > sessionIdleTimeoutMs) {
+                logger.info({ sessionId }, 'Closing idle session')
+                void session.close()
+            }
+        }
+    }, sessionCheckIntervalMs)
+
     // Start Prometheus metrics server on a separate port
     await startMetricsServer()
 
     const shutdown = async () => {
+        clearInterval(idleCheckInterval)
         tokenValidator?.destroy()
         rateLimiter?.destroy()
         for (const [sessionId, session] of sessions.entries()) {
