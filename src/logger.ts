@@ -1,4 +1,9 @@
+import { createRequire } from 'node:module'
+
 import type { Logger } from 'pino'
+
+const require = createRequire(import.meta.url)
+const pkg = require('../package.json') as { version: string }
 
 let logger: Logger
 
@@ -8,7 +13,7 @@ if (typeof process !== 'undefined' && process.versions?.node && !('WebSocketPair
     const pino: any = pinoModule.default
     logger = pino({
         level: process.env.LOG_LEVEL || 'info',
-        base: undefined,
+        base: { service: 'seatable-mcp', version: pkg.version },
         redact: ['req.headers.authorization', 'config.headers.Authorization'],
         timestamp: pino?.stdTimeFunctions?.isoTime,
         formatters: {

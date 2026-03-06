@@ -54,7 +54,15 @@ export class SeaTableClient {
 
         this.limiter = new Bottleneck({ maxConcurrent: 1, minTime: 200 }) // 5 RPS
 
-        logger.info({ msg: `SeaTableClient constructor, serverUrl: ${this.serverUrl}` })
+        logger.debug({ serverUrl: this.serverUrl }, 'SeaTableClient created')
+    }
+
+    /** Returns dtable_uuid and app_name from the last token exchange (available after first API call). */
+    getBaseInfo(): { dtableUuid?: string; appName?: string } {
+        return {
+            dtableUuid: this.tokenManager.getDtableUuid(),
+            appName: this.tokenManager.getAppName(),
+        }
     }
 
     // --- Lazy initialization ---

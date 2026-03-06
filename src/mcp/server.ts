@@ -9,7 +9,10 @@ import {
 import { z } from 'zod'
 import { zodToJsonSchema } from 'zod-to-json-schema'
 
+import { randomUUID } from 'node:crypto'
+
 import { getEnv, parseBases, VERSION } from '../config/env.js'
+import type { CodedError } from '../errors.js'
 import { logger } from '../logger.js'
 import { toolCallsByToolTotal, toolCallsTotal, toolDurationSeconds } from '../metrics/index.js'
 import { createClientFromEnv, createClientFromToken,SeaTableClient } from '../seatable/client.js'
@@ -68,12 +71,20 @@ interface RegisteredTool {
     handler: (args: unknown) => Promise<CallToolResult>
 }
 
+/** Error codes considered client-side (logged as WARN, not ERROR). */
+const CLIENT_ERROR_CODES = new Set([
+    'ERR_VALIDATION', 'ERR_BAD_REQUEST', 'ERR_SCHEMA_UNKNOWN_TABLE',
+    'ERR_SCHEMA_UNKNOWN_COLUMN', 'ERR_UPSERT_MISSING_KEY', 'ERR_UPSERT_AMBIGUOUS',
+    'ERR_FILE_TOO_LARGE', 'ERR_AUTH_EXPIRED', 'ERR_RATE_LIMITED',
+])
+
 export class SeaTableMCPServer {
     private readonly server: Server
     private readonly client: ClientLike
     private readonly contextualClient?: ContextualClient
     private readonly baseNames?: string[]
     private readonly tools = new Map<string, RegisteredTool>()
+    private sessionId?: string
 
     constructor(client: ClientLike, multiBase?: { contextualClient: ContextualClient; baseNames: string[] }) {
         this.client = client
@@ -108,6 +119,10 @@ export class SeaTableMCPServer {
 
     async close(): Promise<void> {
         await this.server.close()
+    }
+
+    setSessionId(id: string): void {
+        this.sessionId = id
     }
 
     private registerAllTools(): void {
@@ -157,7 +172,6 @@ export class SeaTableMCPServer {
             registerEchoArgs(serverAdapter, deps)
         }
 
-        logger.info({ toolCount: this.tools.size }, 'Tools registered')
     }
 
     private initializeHandlers(): void {
@@ -193,10 +207,18 @@ export class SeaTableMCPServer {
 
     private async handleCallTool(request: { params: { name: string; arguments?: Record<string, unknown>; _meta?: Record<string, unknown> } }): Promise<CallToolResult> {
         const toolName = request.params.name
+        const requestId = randomUUID().slice(0, 8)
         const tool = this.tools.get(toolName)
 
+        // Common log context
+        const logCtx = {
+            requestId,
+            ...(this.sessionId && { sessionId: this.sessionId }),
+            tool: toolName,
+        }
+
         if (!tool) {
-            logger.warn({ tool: toolName }, 'Unknown tool called')
+            logger.warn(logCtx, 'Unknown tool called')
             toolCallsTotal.inc({ tool: toolName, status: 'not_found' })
             return {
                 content: [{ type: 'text', text: JSON.stringify(`Unknown tool: ${toolName}`) }],
@@ -216,14 +238,38 @@ export class SeaTableMCPServer {
             const result = await tool.handler(request.params.arguments)
             const durationMs = Date.now() - start
             const durationSec = durationMs / 1000
-            logger.info({ tool: toolName, duration_ms: durationMs }, 'Tool call completed')
+            const baseInfo = this.client.getBaseInfo?.() ?? {}
+            logger.info({
+                ...logCtx,
+                ...(baseInfo.dtableUuid && { dtable_uuid: baseInfo.dtableUuid }),
+                ...(baseInfo.appName && { app_name: baseInfo.appName }),
+                duration_ms: durationMs,
+            }, 'Tool call completed')
             toolCallsTotal.inc({ tool: toolName, status: 'success' })
             toolDurationSeconds.observe({ tool: toolName }, durationSec)
             return result
         } catch (error) {
             const durationMs = Date.now() - start
             const durationSec = durationMs / 1000
-            logger.error({ tool: toolName, duration_ms: durationMs, err: error }, 'Tool call failed')
+            const baseInfo = this.client.getBaseInfo?.() ?? {}
+            const errorCode = (error as CodedError)?.code
+            const isClientError = typeof errorCode === 'string' && CLIENT_ERROR_CODES.has(errorCode)
+
+            const errorCtx = {
+                ...logCtx,
+                ...(baseInfo.dtableUuid && { dtable_uuid: baseInfo.dtableUuid }),
+                ...(baseInfo.appName && { app_name: baseInfo.appName }),
+                ...(errorCode && { error_code: errorCode }),
+                duration_ms: durationMs,
+                err: error,
+            }
+
+            if (isClientError) {
+                logger.warn(errorCtx, 'Tool call failed')
+            } else {
+                logger.error(errorCtx, 'Tool call failed')
+            }
+
             toolCallsTotal.inc({ tool: toolName, status: 'error' })
             toolDurationSeconds.observe({ tool: toolName }, durationSec)
             return {
@@ -246,40 +292,42 @@ export interface BuildServerOptions {
 export function buildServer(options?: BuildServerOptions) {
     const env = getEnv()
 
+    let server: SeaTableMCPServer
+    let mode: string
+
     if (env.SEATABLE_MOCK) {
         const client = new MockSeaTableClient() as unknown as ClientLike
-        const server = new SeaTableMCPServer(client)
-        logger.info('MCP server built (mock)')
-        return server
-    }
-
-    if (options?.apiToken) {
+        server = new SeaTableMCPServer(client)
+        mode = 'mock'
+    } else if (options?.apiToken) {
         const client = createClientFromToken(options.apiToken) as unknown as ClientLike
-        const server = new SeaTableMCPServer(client)
-        logger.info('MCP server built (managed)')
-        return server
-    }
-
-    // Multi-base mode: SEATABLE_BASES is set
-    if (env.SEATABLE_BASES) {
+        server = new SeaTableMCPServer(client)
+        mode = 'managed'
+    } else if (env.SEATABLE_BASES) {
+        // Multi-base mode
         const bases = parseBases(env.SEATABLE_BASES)
         const registry = new ClientRegistry(bases, {
             serverUrl: env.SEATABLE_SERVER_URL,
             timeoutMs: env.HTTP_TIMEOUT_MS,
         })
         const contextualClient = new ContextualClient(registry)
-        const server = new SeaTableMCPServer(contextualClient, {
+        server = new SeaTableMCPServer(contextualClient, {
             contextualClient,
             baseNames: registry.baseNames,
         })
-        logger.info({ bases: registry.baseNames }, 'MCP server built (multi-base)')
-        return server
+        mode = 'multi-base'
+    } else {
+        // Single-base selfhosted mode
+        const client = createClientFromEnv() as unknown as ClientLike
+        server = new SeaTableMCPServer(client)
+        mode = 'selfhosted'
     }
 
-    // Single-base selfhosted mode
-    const client = createClientFromEnv() as unknown as ClientLike
-    const server = new SeaTableMCPServer(client)
-    logger.info('MCP server built')
+    logger.info({
+        mode,
+        tools: server.getToolDefinitions().length,
+    }, 'seatable-mcp started')
+
     return server
 }
 

@@ -1,7 +1,7 @@
  
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 
-import { setEnvOverrides, VERSION } from './config/env.js'
+import { setEnvOverrides } from './config/env.js'
 import { startHttpServer } from './http/httpServer.js'
 import { logger } from './logger.js'
 import { buildServer } from './mcp/server.js'
@@ -76,7 +76,6 @@ async function main() {
     }
 
     await server.connect(transport)
-    logger.info(`MCP SeaTable server v${VERSION} running (stdio)`)
 }
 
 // Exported CLI entry for bin launcher (used by npx)
@@ -86,7 +85,6 @@ export async function runCli() {
 
 async function runHttpServerCli() {
     const server = await startHttpServer()
-    logger.info(`MCP SeaTable server v${VERSION} running (Streamable HTTP)`)
     await new Promise<void>((resolve, reject) => {
         server.on('close', resolve)
         server.on('error', reject)

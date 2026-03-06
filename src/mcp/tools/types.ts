@@ -8,6 +8,9 @@ import type { Env } from '../../config/env.js'
 
 // Client shape used by tools (structural typing over concrete class)
 export interface ClientLike {
+    // Base info (available after first API call)
+    getBaseInfo?(): { dtableUuid?: string; appName?: string }
+
     // Tables
     listTables(): Promise<Array<{ name: string; _id: string }>>
 

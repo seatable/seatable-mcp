@@ -23,6 +23,9 @@ export class ContextualClient implements ClientLike {
         return this.registry.resolve(this.currentBase)
     }
 
+    // Base info
+    getBaseInfo() { return this.client.getBaseInfo?.() ?? {} }
+
     // Tables
     listTables() { return this.client.listTables() }
 

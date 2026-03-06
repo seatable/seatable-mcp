@@ -27,7 +27,8 @@ export function logAxiosError(error: unknown, op: string) {
     }
     const status = err.response?.status ?? 0
     if (status >= 400 && status < 500) {
-        logger.warn(details, 'SeaTable API request failed')
+        // Client errors are logged at DEBUG here; the tool-call handler logs them as WARN
+        logger.debug(details, 'SeaTable API request failed')
     } else {
         logger.error(details, 'SeaTable API request failed')
     }

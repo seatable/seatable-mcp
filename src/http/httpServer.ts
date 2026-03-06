@@ -140,7 +140,8 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
             const transport = new StreamableHTTPServerTransport({
                 sessionIdGenerator: () => randomUUID(),
                 onsessioninitialized: (id) => {
-                    logger.info({ sessionId: id }, 'Streamable HTTP session initialized')
+                    mcpServer.setSessionId(id)
+                    logger.info({ sessionId: id }, 'Session initialized')
                     sessions.set(id, { transport, apiToken, lastActivity: Date.now(), close: cleanup })
                     activeSessions.inc()
                 },
@@ -272,11 +273,13 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
         clearInterval(idleCheckInterval)
         tokenValidator?.destroy()
         rateLimiter?.destroy()
+        const sessionCount = sessions.size
         for (const [sessionId, session] of sessions.entries()) {
             logger.debug({ sessionId }, 'Closing session during shutdown')
             await session.close()
         }
         await new Promise<void>((resolve) => server.close(() => resolve()))
+        logger.info({ closedSessions: sessionCount }, 'Shutdown complete')
     }
 
     const signals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM']
