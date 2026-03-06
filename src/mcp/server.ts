@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { type Transport } from '@modelcontextprotocol/sdk/shared/transport.js'
 import {
@@ -8,8 +10,6 @@ import {
 } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
 import { zodToJsonSchema } from 'zod-to-json-schema'
-
-import { randomUUID } from 'node:crypto'
 
 import { getEnv, parseBases, VERSION } from '../config/env.js'
 import type { CodedError } from '../errors.js'
