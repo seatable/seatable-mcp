@@ -69,7 +69,8 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
     const tokenValidator = mode === 'managed' ? new TokenValidator(env.SEATABLE_SERVER_URL) : undefined
     const rateLimiter = mode === 'managed' ? new RateLimitManager() : undefined
 
-    const oauthProvider = mode === 'managed' ? new OAuthProvider() : undefined
+    const oauthIssuerUrl = `http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`
+    const oauthProvider = mode === 'managed' ? new OAuthProvider(process.env.OAUTH_ISSUER_URL ?? oauthIssuerUrl) : undefined
 
     const toolDefinitions = getStaticToolDefinitions()
     const sessions = new Map<string, ActiveSession>()
@@ -248,7 +249,12 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
         }
 
         // OAuth endpoints (managed mode only)
-        if (oauthProvider && url.pathname === '/oauth/authorize' && (req.method === 'GET' || req.method === 'POST')) {
+        if (oauthProvider && req.method === 'GET' && url.pathname === '/.well-known/oauth-authorization-server') {
+            oauthProvider.handleMetadata(req, res)
+            return
+        }
+
+        if (oauthProvider && (url.pathname === '/authorize' || url.pathname === '/oauth/authorize') && (req.method === 'GET' || req.method === 'POST')) {
             try {
                 await oauthProvider.handleAuthorize(req, res, url)
             } catch (error) {
@@ -260,11 +266,23 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
             return
         }
 
-        if (oauthProvider && url.pathname === '/oauth/token' && req.method === 'POST') {
+        if (oauthProvider && (url.pathname === '/token' || url.pathname === '/oauth/token') && req.method === 'POST') {
             try {
                 await oauthProvider.handleToken(req, res)
             } catch (error) {
                 logger.error({ err: error }, 'Error handling OAuth token exchange')
+                if (!res.headersSent) {
+                    res.writeHead(500, { 'content-type': 'text/plain' }).end('Internal server error')
+                }
+            }
+            return
+        }
+
+        if (oauthProvider && url.pathname === '/register' && req.method === 'POST') {
+            try {
+                await oauthProvider.handleRegister(req, res)
+            } catch (error) {
+                logger.error({ err: error }, 'Error handling OAuth client registration')
                 if (!res.headersSent) {
                     res.writeHead(500, { 'content-type': 'text/plain' }).end('Internal server error')
                 }

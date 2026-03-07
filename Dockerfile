@@ -6,7 +6,7 @@ COPY . .
 RUN npm run build && npm prune --production
 
 FROM node:22-alpine
-RUN npm cache clean --force && rm -rf /usr/local/lib/node_modules/npm
+RUN apk upgrade --no-cache && npm cache clean --force && rm -rf /usr/local/lib/node_modules/npm
 WORKDIR /app
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules

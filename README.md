@@ -49,8 +49,8 @@ If you use [SeaTable Cloud](https://cloud.seatable.io), there is a hosted MCP se
 
 - **Server URL:** `https://mcp.seatable.com/mcp`
 - **Auth type:** OAuth
-- **Authorization URL:** `https://mcp.seatable.com/oauth/authorize`
-- **Token URL:** `https://mcp.seatable.com/oauth/token`
+- **Authorization URL:** `https://mcp.seatable.com/authorize`
+- **Token URL:** `https://mcp.seatable.com/token`
 
 You will be prompted to enter your SeaTable API token during the authorization step.
 
@@ -133,13 +133,18 @@ PORT=3000 npx -y @seatable/mcp-seatable --sse
 
 Clients pass their API token via `Authorization: Bearer <token>` on session initialization. The server validates the token against SeaTable and applies rate limits (60 req/min per token, 120/min per IP, 5 concurrent connections per token).
 
-**OAuth support:** Managed mode also exposes OAuth 2.0 endpoints (`/oauth/authorize` and `/oauth/token`), enabling OAuth-compatible clients like ChatGPT to connect. During the OAuth flow, the user enters their SeaTable API token, which is then used as the access token — no external OAuth provider required.
+**OAuth support:** Managed mode also exposes OAuth 2.0 endpoints (`/authorize` and `/token`), enabling OAuth-compatible clients like ChatGPT to connect. During the OAuth flow, the user enters their SeaTable API token, which is then used as the access token — no external OAuth provider required.
 
-| Setting | Value |
+OAuth endpoints follow the MCP specification (RFC 8414 metadata discovery, PKCE, dynamic client registration):
+
+| Endpoint | Path |
 |---|---|
-| Authorization URL | `https://your-server.com/oauth/authorize` |
-| Token URL | `https://your-server.com/oauth/token` |
-| Client ID / Secret | Any value (not validated) |
+| Metadata Discovery | `/.well-known/oauth-authorization-server` |
+| Authorization | `/authorize` |
+| Token | `/token` |
+| Client Registration | `/register` |
+
+Client ID and secret are not validated — dynamic client registration generates one automatically.
 
 ### Docker
 

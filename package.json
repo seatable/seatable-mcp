@@ -60,6 +60,9 @@
     "prepublishOnly": "npm run build && npm run test && npm run lint",
     "prepare": "npm run build"
   },
+  "overrides": {
+    "express-rate-limit": "^8.3.0"
+  },
   "engines": {
     "node": ">=18"
   },

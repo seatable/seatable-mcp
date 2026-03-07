@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 import { logger } from '../logger.js'
@@ -6,6 +6,8 @@ import { logger } from '../logger.js'
 interface AuthorizationCode {
     apiToken: string
     redirectUri: string
+    codeChallenge?: string
+    codeChallengeMethod?: string
     expiresAt: number
 }
 
@@ -15,8 +17,10 @@ const CLEANUP_INTERVAL_MS = 60 * 1000
 export class OAuthProvider {
     private readonly codes = new Map<string, AuthorizationCode>()
     private readonly cleanupInterval: ReturnType<typeof setInterval>
+    private readonly issuerUrl: string
 
-    constructor() {
+    constructor(issuerUrl: string) {
+        this.issuerUrl = issuerUrl.replace(/\/$/, '')
         this.cleanupInterval = setInterval(() => this.cleanup(), CLEANUP_INTERVAL_MS)
         if (this.cleanupInterval.unref) {
             this.cleanupInterval.unref()
@@ -24,19 +28,70 @@ export class OAuthProvider {
     }
 
     /**
-     * GET /oauth/authorize — renders the authorization form
-     * POST /oauth/authorize — processes the form submission
+     * GET /.well-known/oauth-authorization-server — RFC 8414 metadata
+     */
+    handleMetadata(_req: IncomingMessage, res: ServerResponse): void {
+        const metadata = {
+            issuer: this.issuerUrl,
+            authorization_endpoint: `${this.issuerUrl}/authorize`,
+            token_endpoint: `${this.issuerUrl}/token`,
+            registration_endpoint: `${this.issuerUrl}/register`,
+            response_types_supported: ['code'],
+            grant_types_supported: ['authorization_code', 'refresh_token'],
+            token_endpoint_auth_methods_supported: ['none'],
+            code_challenge_methods_supported: ['S256', 'plain'],
+        }
+        res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(metadata))
+    }
+
+    /**
+     * POST /register — Dynamic Client Registration (RFC 7591)
+     * Returns a generated client_id. We don't validate client credentials.
+     */
+    async handleRegister(req: IncomingMessage, res: ServerResponse): Promise<void> {
+        if (req.method !== 'POST') {
+            res.writeHead(405, { 'content-type': 'text/plain' }).end('Method not allowed')
+            return
+        }
+
+        const body = await this.parseBody(req)
+        const clientName = body.get('client_name') ?? 'mcp-client'
+        const redirectUris = body.get('redirect_uris') ?? ''
+
+        const clientId = randomBytes(16).toString('hex')
+
+        logger.info({ clientName }, 'OAuth dynamic client registration')
+
+        const response: Record<string, unknown> = {
+            client_id: clientId,
+            client_name: clientName,
+            token_endpoint_auth_method: 'none',
+        }
+
+        if (redirectUris) {
+            response.redirect_uris = typeof redirectUris === 'string' && redirectUris.startsWith('[')
+                ? JSON.parse(redirectUris)
+                : [redirectUris]
+        }
+
+        res.writeHead(201, { 'content-type': 'application/json' }).end(JSON.stringify(response))
+    }
+
+    /**
+     * GET /authorize — renders the authorization form
+     * POST /authorize — processes the form submission
      */
     async handleAuthorize(req: IncomingMessage, res: ServerResponse, url: URL): Promise<void> {
         const clientId = url.searchParams.get('client_id') ?? ''
         const redirectUri = url.searchParams.get('redirect_uri') ?? ''
         const state = url.searchParams.get('state') ?? ''
         const responseType = url.searchParams.get('response_type') ?? ''
+        const codeChallenge = url.searchParams.get('code_challenge') ?? ''
+        const codeChallengeMethod = url.searchParams.get('code_challenge_method') ?? ''
 
         if (req.method === 'GET') {
-            // Render the authorization form
             res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
-            res.end(this.renderAuthorizePage(clientId, redirectUri, state, responseType))
+            res.end(this.renderAuthorizePage(clientId, redirectUri, state, responseType, codeChallenge, codeChallengeMethod))
             return
         }
 
@@ -45,10 +100,12 @@ export class OAuthProvider {
             const apiToken = body.get('api_token') ?? ''
             const formRedirectUri = body.get('redirect_uri') ?? redirectUri
             const formState = body.get('state') ?? state
+            const formCodeChallenge = body.get('code_challenge') ?? codeChallenge
+            const formCodeChallengeMethod = body.get('code_challenge_method') ?? codeChallengeMethod
 
             if (!apiToken) {
                 res.writeHead(400, { 'content-type': 'text/html; charset=utf-8' })
-                res.end(this.renderAuthorizePage(clientId, formRedirectUri, formState, responseType, 'Please enter your API token.'))
+                res.end(this.renderAuthorizePage(clientId, formRedirectUri, formState, responseType, formCodeChallenge, formCodeChallengeMethod, 'Please enter your API token.'))
                 return
             }
 
@@ -57,17 +114,17 @@ export class OAuthProvider {
                 return
             }
 
-            // Generate authorization code and store with the API token
             const code = randomBytes(32).toString('hex')
             this.codes.set(code, {
                 apiToken,
                 redirectUri: formRedirectUri,
+                codeChallenge: formCodeChallenge || undefined,
+                codeChallengeMethod: formCodeChallengeMethod || undefined,
                 expiresAt: Date.now() + CODE_TTL_MS,
             })
 
             logger.info('OAuth authorization code issued')
 
-            // Redirect back to the client with the code
             const redirect = new URL(formRedirectUri)
             redirect.searchParams.set('code', code)
             if (formState) {
@@ -83,7 +140,7 @@ export class OAuthProvider {
     }
 
     /**
-     * POST /oauth/token — exchanges authorization code for access token
+     * POST /token — exchanges authorization code for access token
      */
     async handleToken(req: IncomingMessage, res: ServerResponse): Promise<void> {
         if (req.method !== 'POST') {
@@ -95,11 +152,11 @@ export class OAuthProvider {
         const grantType = body.get('grant_type')
         const code = body.get('code')
         const redirectUri = body.get('redirect_uri')
+        const codeVerifier = body.get('code_verifier')
 
-        // Support both authorization_code and refresh_token grant types
+        // Refresh token grant — the refresh token IS the API token
         if (grantType === 'refresh_token') {
             const refreshToken = body.get('refresh_token') ?? ''
-            // The refresh token IS the API token — just return it again
             if (!refreshToken) {
                 res.writeHead(400, { 'content-type': 'application/json' })
                     .end(JSON.stringify({ error: 'invalid_request', error_description: 'Missing refresh_token' }))
@@ -137,18 +194,37 @@ export class OAuthProvider {
         // Single-use: delete immediately
         this.codes.delete(code)
 
-        // Check expiry
         if (Date.now() > stored.expiresAt) {
             res.writeHead(400, { 'content-type': 'application/json' })
                 .end(JSON.stringify({ error: 'invalid_grant', error_description: 'Authorization code expired' }))
             return
         }
 
-        // Validate redirect_uri matches
+        // Validate redirect_uri
         if (redirectUri && redirectUri !== stored.redirectUri) {
             res.writeHead(400, { 'content-type': 'application/json' })
                 .end(JSON.stringify({ error: 'invalid_grant', error_description: 'redirect_uri mismatch' }))
             return
+        }
+
+        // PKCE verification
+        if (stored.codeChallenge) {
+            if (!codeVerifier) {
+                res.writeHead(400, { 'content-type': 'application/json' })
+                    .end(JSON.stringify({ error: 'invalid_request', error_description: 'Missing code_verifier' }))
+                return
+            }
+
+            const expected = stored.codeChallengeMethod === 'plain'
+                ? codeVerifier
+                : base64UrlEncode(createHash('sha256').update(codeVerifier).digest())
+
+            if (expected !== stored.codeChallenge) {
+                logger.warn('OAuth PKCE verification failed')
+                res.writeHead(400, { 'content-type': 'application/json' })
+                    .end(JSON.stringify({ error: 'invalid_grant', error_description: 'PKCE verification failed' }))
+                return
+            }
         }
 
         logger.info('OAuth token exchange successful')
@@ -158,7 +234,6 @@ export class OAuthProvider {
         res.end(JSON.stringify({
             access_token: stored.apiToken,
             token_type: 'Bearer',
-            // Include refresh_token so clients can refresh without re-auth
             refresh_token: stored.apiToken,
         }))
     }
@@ -178,13 +253,7 @@ export class OAuthProvider {
     }
 
     private async parseFormBody(req: IncomingMessage): Promise<Map<string, string>> {
-        const raw = await new Promise<string>((resolve, reject) => {
-            const chunks: Buffer[] = []
-            req.on('data', (chunk) => chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk))
-            req.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')))
-            req.on('error', reject)
-        })
-
+        const raw = await this.readBody(req)
         const result = new Map<string, string>()
         const contentType = req.headers['content-type'] ?? ''
 
@@ -196,7 +265,6 @@ export class OAuthProvider {
                 }
             } catch { /* ignore */ }
         } else {
-            // application/x-www-form-urlencoded
             const params = new URLSearchParams(raw)
             for (const [key, value] of params) {
                 result.set(key, value)
@@ -206,7 +274,33 @@ export class OAuthProvider {
         return result
     }
 
-    private renderAuthorizePage(clientId: string, redirectUri: string, state: string, responseType: string, error?: string): string {
+    private async parseBody(req: IncomingMessage): Promise<Map<string, string>> {
+        const raw = await this.readBody(req)
+        const result = new Map<string, string>()
+        try {
+            const json = JSON.parse(raw)
+            for (const [key, value] of Object.entries(json)) {
+                result.set(key, typeof value === 'string' ? value : JSON.stringify(value))
+            }
+        } catch {
+            const params = new URLSearchParams(raw)
+            for (const [key, value] of params) {
+                result.set(key, value)
+            }
+        }
+        return result
+    }
+
+    private readBody(req: IncomingMessage): Promise<string> {
+        return new Promise<string>((resolve, reject) => {
+            const chunks: Buffer[] = []
+            req.on('data', (chunk) => chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk))
+            req.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')))
+            req.on('error', reject)
+        })
+    }
+
+    private renderAuthorizePage(clientId: string, redirectUri: string, state: string, responseType: string, codeChallenge: string, codeChallengeMethod: string, error?: string): string {
         const errorHtml = error ? `<div class="error">${this.escapeHtml(error)}</div>` : ''
 
         return `<!DOCTYPE html>
@@ -267,11 +361,13 @@ export class OAuthProvider {
         <h1>SeaTable MCP</h1>
         <p class="subtitle">Enter your SeaTable API token to authorize access to your base.</p>
         ${errorHtml}
-        <form method="POST" action="/oauth/authorize">
+        <form method="POST" action="/authorize">
             <input type="hidden" name="redirect_uri" value="${this.escapeHtml(redirectUri)}">
             <input type="hidden" name="state" value="${this.escapeHtml(state)}">
             <input type="hidden" name="client_id" value="${this.escapeHtml(clientId)}">
             <input type="hidden" name="response_type" value="${this.escapeHtml(responseType)}">
+            <input type="hidden" name="code_challenge" value="${this.escapeHtml(codeChallenge)}">
+            <input type="hidden" name="code_challenge_method" value="${this.escapeHtml(codeChallengeMethod)}">
             <label for="api_token">API Token</label>
             <input type="password" id="api_token" name="api_token" placeholder="Enter your SeaTable API token" required autofocus>
             <button type="submit">Authorize</button>
@@ -285,4 +381,11 @@ export class OAuthProvider {
     private escapeHtml(str: string): string {
         return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
     }
+}
+
+function base64UrlEncode(buffer: Buffer): string {
+    return buffer.toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '')
 }
