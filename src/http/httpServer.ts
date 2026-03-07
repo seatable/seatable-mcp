@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 
+import { OAuthProvider } from '../auth/oauthProvider.js'
 import { TokenValidator } from '../auth/tokenValidator.js'
 import { getEnv, type ServerMode, VERSION } from '../config/env.js'
 import { logger } from '../logger.js'
@@ -67,6 +68,8 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
     const mode: ServerMode = env.SEATABLE_MODE
     const tokenValidator = mode === 'managed' ? new TokenValidator(env.SEATABLE_SERVER_URL) : undefined
     const rateLimiter = mode === 'managed' ? new RateLimitManager() : undefined
+
+    const oauthProvider = mode === 'managed' ? new OAuthProvider() : undefined
 
     const toolDefinitions = getStaticToolDefinitions()
     const sessions = new Map<string, ActiveSession>()
@@ -234,11 +237,38 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
         if (req.method === 'GET' && url.pathname === '/.well-known/mcp/server-card.json') {
             const card = {
                 serverInfo: { name: '@seatable/mcp-seatable', version: VERSION },
-                authentication: { required: true, schemes: ['bearer'] },
+                authentication: mode === 'managed'
+                    ? { required: true, schemes: ['oauth', 'bearer'] }
+                    : { required: false },
                 capabilities: { tools: true, resources: false, prompts: false },
                 tools: toolDefinitions,
             }
             res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(card))
+            return
+        }
+
+        // OAuth endpoints (managed mode only)
+        if (oauthProvider && url.pathname === '/oauth/authorize' && (req.method === 'GET' || req.method === 'POST')) {
+            try {
+                await oauthProvider.handleAuthorize(req, res, url)
+            } catch (error) {
+                logger.error({ err: error }, 'Error handling OAuth authorize')
+                if (!res.headersSent) {
+                    res.writeHead(500, { 'content-type': 'text/plain' }).end('Internal server error')
+                }
+            }
+            return
+        }
+
+        if (oauthProvider && url.pathname === '/oauth/token' && req.method === 'POST') {
+            try {
+                await oauthProvider.handleToken(req, res)
+            } catch (error) {
+                logger.error({ err: error }, 'Error handling OAuth token exchange')
+                if (!res.headersSent) {
+                    res.writeHead(500, { 'content-type': 'text/plain' }).end('Internal server error')
+                }
+            }
             return
         }
 
@@ -273,6 +303,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
         clearInterval(idleCheckInterval)
         tokenValidator?.destroy()
         rateLimiter?.destroy()
+        oauthProvider?.destroy()
         const sessionCount = sessions.size
         for (const [sessionId, session] of sessions.entries()) {
             logger.debug({ sessionId }, 'Closing session during shutdown')

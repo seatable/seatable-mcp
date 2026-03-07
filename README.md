@@ -45,6 +45,15 @@ If you use [SeaTable Cloud](https://cloud.seatable.io), there is a hosted MCP se
 }
 ```
 
+**ChatGPT and other OAuth-compatible clients** — use the built-in OAuth flow. In ChatGPT's developer mode, configure:
+
+- **Server URL:** `https://mcp.seatable.com/mcp`
+- **Auth type:** OAuth
+- **Authorization URL:** `https://mcp.seatable.com/oauth/authorize`
+- **Token URL:** `https://mcp.seatable.com/oauth/token`
+
+You will be prompted to enter your SeaTable API token during the authorization step.
+
 ### Self-hosted SeaTable
 
 For self-hosted SeaTable instances, run the MCP server locally via `npx`. Your IDE starts and manages the process automatically.
@@ -124,6 +133,14 @@ PORT=3000 npx -y @seatable/mcp-seatable --sse
 
 Clients pass their API token via `Authorization: Bearer <token>` on session initialization. The server validates the token against SeaTable and applies rate limits (60 req/min per token, 120/min per IP, 5 concurrent connections per token).
 
+**OAuth support:** Managed mode also exposes OAuth 2.0 endpoints (`/oauth/authorize` and `/oauth/token`), enabling OAuth-compatible clients like ChatGPT to connect. During the OAuth flow, the user enters their SeaTable API token, which is then used as the access token — no external OAuth provider required.
+
+| Setting | Value |
+|---|---|
+| Authorization URL | `https://your-server.com/oauth/authorize` |
+| Token URL | `https://your-server.com/oauth/token` |
+| Client ID / Secret | Any value (not validated) |
+
 ### Docker
 
 ```bash
@@ -144,7 +161,7 @@ The security characteristics differ significantly between transport modes:
 | | stdio (default) | Selfhosted HTTP | Managed HTTP |
 |---|---|---|---|
 | **Network exposure** | None (local process) | TCP port, **no auth** | TCP port, Bearer auth |
-| **Authentication** | Not needed (local) | None | Per-session token validated against SeaTable |
+| **Authentication** | Not needed (local) | None | Bearer token or OAuth 2.0, validated against SeaTable |
 | **Rate limiting** | None | None | Per-token, per-IP, global |
 | **Connection limits** | N/A | None | 5 concurrent sessions per token |
 | **Data scope** | All configured bases | All configured bases | One base per client token |
