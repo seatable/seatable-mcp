@@ -22,7 +22,7 @@ export class RateLimitManager {
     readonly perToken = new SlidingWindowLimiter(60, ONE_MINUTE)
     readonly perIp = new SlidingWindowLimiter(120, ONE_MINUTE)
     readonly global = new SlidingWindowLimiter(5000, ONE_MINUTE)
-    readonly connections = new ConnectionCounter(5)
+    readonly connections = new ConnectionCounter(20)
 
     private cleanupInterval?: ReturnType<typeof setInterval>
 

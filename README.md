@@ -131,7 +131,7 @@ SEATABLE_SERVER_URL=https://your-seatable-server.com \
 PORT=3000 npx -y @seatable/mcp-seatable --sse
 ```
 
-Clients pass their API token via `Authorization: Bearer <token>` on session initialization. The server validates the token against SeaTable and applies rate limits (60 req/min per token, 120/min per IP, 5 concurrent connections per token).
+Clients pass their API token via `Authorization: Bearer <token>` on session initialization. The server validates the token against SeaTable and applies rate limits (60 req/min per token, 120/min per IP, 20 concurrent connections per token).
 
 **OAuth support:** Managed mode also exposes OAuth 2.0 endpoints (`/authorize` and `/token`), enabling OAuth-compatible clients like ChatGPT to connect. During the OAuth flow, the user enters their SeaTable API token, which is then used as the access token — no external OAuth provider required.
 
@@ -168,7 +168,7 @@ The security characteristics differ significantly between transport modes:
 | **Network exposure** | None (local process) | TCP port, **no auth** | TCP port, Bearer auth |
 | **Authentication** | Not needed (local) | None | Bearer token or OAuth 2.0, validated against SeaTable |
 | **Rate limiting** | None | None | Per-token, per-IP, global |
-| **Connection limits** | N/A | None | 5 concurrent sessions per token |
+| **Connection limits** | N/A | None | 20 concurrent sessions per token |
 | **Data scope** | All configured bases | All configured bases | One base per client token |
 
 > **⚠️ Warning:** Selfhosted HTTP mode (`--sse` / `--http`) has **no authentication**. Anyone who can reach the port gets full access to all configured bases, including write and delete operations. Only run it in trusted networks (localhost, Docker-internal) or behind a reverse proxy that handles authentication. For untrusted networks, use **managed mode** instead.
