@@ -9,7 +9,7 @@ let port: number
 let provider: OAuthProvider
 
 function startTestServer(): Promise<void> {
-    provider = new OAuthProvider('http://localhost:0')
+    provider = new OAuthProvider()
     server = createServer(async (req: IncomingMessage, res: ServerResponse) => {
         const url = new URL(req.url!, `http://localhost`)
         if (url.pathname === '/.well-known/oauth-authorization-server') {

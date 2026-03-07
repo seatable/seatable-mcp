@@ -17,10 +17,10 @@ const CLEANUP_INTERVAL_MS = 60 * 1000
 export class OAuthProvider {
     private readonly codes = new Map<string, AuthorizationCode>()
     private readonly cleanupInterval: ReturnType<typeof setInterval>
-    private readonly issuerUrl: string
+    private readonly configuredHostname?: string
 
-    constructor(issuerUrl: string) {
-        this.issuerUrl = issuerUrl.replace(/\/$/, '')
+    constructor(hostname?: string) {
+        this.configuredHostname = hostname
         this.cleanupInterval = setInterval(() => this.cleanup(), CLEANUP_INTERVAL_MS)
         if (this.cleanupInterval.unref) {
             this.cleanupInterval.unref()
@@ -28,14 +28,27 @@ export class OAuthProvider {
     }
 
     /**
+     * Derive the base URL from SEATABLE_MCP_HOSTNAME or the incoming Host header.
+     */
+    private resolveBaseUrl(req: IncomingMessage): string {
+        if (this.configuredHostname) {
+            return `https://${this.configuredHostname}`
+        }
+        const host = req.headers.host ?? 'localhost'
+        const proto = req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http'
+        return `${proto}://${host}`
+    }
+
+    /**
      * GET /.well-known/oauth-authorization-server — RFC 8414 metadata
      */
-    handleMetadata(_req: IncomingMessage, res: ServerResponse): void {
+    handleMetadata(req: IncomingMessage, res: ServerResponse): void {
+        const baseUrl = this.resolveBaseUrl(req)
         const metadata = {
-            issuer: this.issuerUrl,
-            authorization_endpoint: `${this.issuerUrl}/authorize`,
-            token_endpoint: `${this.issuerUrl}/token`,
-            registration_endpoint: `${this.issuerUrl}/register`,
+            issuer: baseUrl,
+            authorization_endpoint: `${baseUrl}/authorize`,
+            token_endpoint: `${baseUrl}/token`,
+            registration_endpoint: `${baseUrl}/register`,
             response_types_supported: ['code'],
             grant_types_supported: ['authorization_code', 'refresh_token'],
             token_endpoint_auth_methods_supported: ['none'],

@@ -69,8 +69,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
     const tokenValidator = mode === 'managed' ? new TokenValidator(env.SEATABLE_SERVER_URL) : undefined
     const rateLimiter = mode === 'managed' ? new RateLimitManager() : undefined
 
-    const oauthIssuerUrl = `http://${host === '0.0.0.0' ? 'localhost' : host}:${port}`
-    const oauthProvider = mode === 'managed' ? new OAuthProvider(process.env.OAUTH_ISSUER_URL ?? oauthIssuerUrl) : undefined
+    const oauthProvider = mode === 'managed' ? new OAuthProvider(process.env.SEATABLE_MCP_HOSTNAME) : undefined
 
     const toolDefinitions = getStaticToolDefinitions()
     const sessions = new Map<string, ActiveSession>()
