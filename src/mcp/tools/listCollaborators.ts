@@ -11,7 +11,7 @@ export const registerListCollaborators: ToolRegistrar = (server, { client }) => 
                 properties: {},
                 required: [],
             },
-            annotations: { readOnlyHint: true },
+            annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
         },
         async () => {
             const users = await client.listCollaborators()

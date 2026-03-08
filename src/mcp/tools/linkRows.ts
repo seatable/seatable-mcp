@@ -15,7 +15,7 @@ export const registerLinkRows: ToolRegistrar = (server, { client, getInputSchema
       title: 'Link Rows',
       description: 'Create links between rows via the dedicated links endpoint. This is the ONLY way to create links — link columns cannot be written via add_row or update_rows.',
       inputSchema: getInputSchema(InputSchema),
-      annotations: { readOnlyHint: false, destructiveHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
     async (args: unknown) => {
       const { table, link_column, pairs } = InputSchema.parse(args)

@@ -14,7 +14,7 @@ export const registerDeleteRows: ToolRegistrar = (server, { client, getInputSche
             title: 'Delete Rows',
             description: 'Delete one or more rows from a table by their IDs.',
             inputSchema: getInputSchema(InputSchema),
-            annotations: { readOnlyHint: false, destructiveHint: true },
+            annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
         },
         async (args: unknown) => {
             const { table, row_ids } = InputSchema.parse(args)

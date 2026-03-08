@@ -19,7 +19,7 @@ export const registerAddSelectOptions: ToolRegistrar = (server, { client, getInp
       title: 'Add Select Options',
       description: 'Add new options to a single-select or multi-select column. Use this before writing rows with option values that do not exist yet.',
       inputSchema: getInputSchema(InputSchema),
-      annotations: { readOnlyHint: false, destructiveHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
     async (args: unknown) => {
       const parsed = InputSchema.parse(args)

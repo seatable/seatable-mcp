@@ -16,7 +16,7 @@ export const registerAddRow: ToolRegistrar = (server, { client, getInputSchema }
             title: 'Add Row',
             description: 'Add a new row to a table. Link and file/image columns cannot be set here — use link_rows and upload_file instead. Note: the response may contain column keys instead of column names due to a SeaTable API limitation.',
             inputSchema: getInputSchema(InputSchema),
-            annotations: { readOnlyHint: false, destructiveHint: false },
+            annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
         },
         async (args: unknown) => {
             const { table, row } = InputSchema.parse(args)

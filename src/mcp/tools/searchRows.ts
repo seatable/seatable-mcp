@@ -14,7 +14,7 @@ export const registerSearchRows: ToolRegistrar = (server, { client, getInputSche
             title: 'Search Rows',
             description: 'Search rows with a filter object',
             inputSchema: getInputSchema(InputSchema),
-            annotations: { readOnlyHint: true },
+            annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
         },
         async (args: unknown) => {
             const parsed = InputSchema.parse(args)
