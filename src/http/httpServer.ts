@@ -234,6 +234,11 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
             return
         }
 
+        if (req.method === 'GET' && url.pathname === '/.well-known/openai-apps-challenge' && process.env.OPENAI_APPS_CHALLENGE_TOKEN) {
+            res.writeHead(200, { 'content-type': 'text/plain' }).end(process.env.OPENAI_APPS_CHALLENGE_TOKEN)
+            return
+        }
+
         if (req.method === 'GET' && url.pathname === '/.well-known/mcp/server-card.json') {
             const card = {
                 serverInfo: { name: '@seatable/mcp-seatable', version: VERSION },
