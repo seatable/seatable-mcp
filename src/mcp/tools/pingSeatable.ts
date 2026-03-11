@@ -11,7 +11,7 @@ export const registerPingSeatable: ToolRegistrar = (server, { client, getInputSc
             title: 'Ping SeaTable',
             description: 'Health check that verifies connectivity and auth to SeaTable',
             inputSchema: getInputSchema(InputSchema),
-            annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+            annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         },
         async () => {
             const started = Date.now()

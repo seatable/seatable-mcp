@@ -14,7 +14,7 @@ export const registerQuerySql: ToolRegistrar = (server, { client, getInputSchema
             title: 'Query SQL',
             description: 'Execute raw SQL queries against SeaTable. Supports SELECT, INSERT, UPDATE, DELETE. Use ? placeholders for parameters to prevent SQL injection.',
             inputSchema: getInputSchema(InputSchema),
-            annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false },
+            annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
         },
         async (args: unknown) => {
             const { sql, parameters } = InputSchema.parse(args)

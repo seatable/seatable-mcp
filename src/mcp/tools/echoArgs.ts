@@ -13,6 +13,7 @@ export const registerEchoArgs: ToolRegistrar = (server) => {
       title: 'Echo Args (DEBUG)',
       description: 'Debug tool that returns exactly what arguments the client sent',
       inputSchema: InputJsonSchema as any,
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async (args: unknown) => {
       return { content: [{ type: 'text', text: JSON.stringify({ received: args }) }] }

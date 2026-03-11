@@ -14,7 +14,7 @@ export const registerGetRow: ToolRegistrar = (server, { client, getInputSchema }
             title: 'Get Row',
             description: 'Get a row by ID from a table',
             inputSchema: getInputSchema(InputSchema),
-            annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+            annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         },
         async (args: unknown) => {
             const parsed = InputSchema.parse(args)

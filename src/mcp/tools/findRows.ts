@@ -220,7 +220,7 @@ export const registerFindRows: ToolRegistrar = (server, { client, getInputSchema
         'Operators: eq, ne, in, gt, gte, lt, lte, contains, starts_with, ends_with, is_null. ' +
         'Combine with {"and":[...]} or {"or":[...]}. Negate with {"not":{...}}.',
       inputSchema: getInputSchema(InputSchema),
-      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
     async (args: unknown) => {
       const parsed = InputSchema.parse(args)
