@@ -150,6 +150,84 @@ describe('HTTP Server', () => {
     })
 })
 
+describe('CORS handling', () => {
+    let corsServer: ReturnType<typeof import('node:http').createServer>
+    let corsBaseUrl: string
+
+    beforeEach(async () => {
+        process.env.CORS_ALLOWED_ORIGINS = 'https://cloud.seatable.io,https://seatable-demo.de'
+        corsServer = await startHttpServer({ port: 0 })
+        const addr = corsServer.address() as AddressInfo
+        corsBaseUrl = `http://127.0.0.1:${addr.port}`
+    })
+
+    afterEach(async () => {
+        delete process.env.CORS_ALLOWED_ORIGINS
+        if (corsServer) {
+            await new Promise<void>((resolve) => corsServer.close(() => resolve()))
+        }
+    })
+
+    it('sets CORS headers for allowed origin', async () => {
+        const res = await fetch(`${corsBaseUrl}/health`, {
+            headers: { origin: 'https://cloud.seatable.io' },
+        })
+        expect(res.status).toBe(200)
+        expect(res.headers.get('access-control-allow-origin')).toBe('https://cloud.seatable.io')
+        expect(res.headers.get('access-control-allow-credentials')).toBe('true')
+        expect(res.headers.get('access-control-expose-headers')).toBe('mcp-session-id')
+    })
+
+    it('does not set CORS headers for disallowed origin', async () => {
+        const res = await fetch(`${corsBaseUrl}/health`, {
+            headers: { origin: 'https://evil.com' },
+        })
+        expect(res.status).toBe(200)
+        expect(res.headers.get('access-control-allow-origin')).toBeNull()
+    })
+
+    it('does not set CORS headers when no origin header is sent', async () => {
+        const res = await fetch(`${corsBaseUrl}/health`)
+        expect(res.status).toBe(200)
+        expect(res.headers.get('access-control-allow-origin')).toBeNull()
+    })
+
+    it('responds to OPTIONS preflight with 204', async () => {
+        const res = await fetch(`${corsBaseUrl}/mcp`, {
+            method: 'OPTIONS',
+            headers: {
+                origin: 'https://seatable-demo.de',
+                'access-control-request-method': 'POST',
+            },
+        })
+        expect(res.status).toBe(204)
+        expect(res.headers.get('access-control-allow-origin')).toBe('https://seatable-demo.de')
+        expect(res.headers.get('access-control-allow-methods')).toBe('GET, POST, DELETE, OPTIONS')
+    })
+
+    it('OPTIONS from disallowed origin returns 204 without CORS headers', async () => {
+        const res = await fetch(`${corsBaseUrl}/mcp`, {
+            method: 'OPTIONS',
+            headers: {
+                origin: 'https://evil.com',
+                'access-control-request-method': 'POST',
+            },
+        })
+        expect(res.status).toBe(204)
+        expect(res.headers.get('access-control-allow-origin')).toBeNull()
+    })
+})
+
+describe('No CORS when env is unset', () => {
+    it('does not set CORS headers on the main server', async () => {
+        const res = await fetch(`${baseUrl}/health`, {
+            headers: { origin: 'https://cloud.seatable.io' },
+        })
+        expect(res.status).toBe(200)
+        expect(res.headers.get('access-control-allow-origin')).toBeNull()
+    })
+})
+
 describe('Session idle timeout', () => {
     let idleServer: ReturnType<typeof import('node:http').createServer>
     let idleBaseUrl: string

@@ -188,6 +188,7 @@ Optional:
 
 - `SEATABLE_MODE` — `selfhosted` (default) or `managed` (multi-tenant HTTP with per-client auth)
 - `SEATABLE_MOCK=true` — Enable mock mode for offline testing
+- `CORS_ALLOWED_ORIGINS` — Comma-separated list of allowed origins for CORS (HTTP mode only, disabled if unset)
 - `METRICS_PORT` — Prometheus metrics port (default: `9090`, HTTP mode only)
 
 ## Monitoring

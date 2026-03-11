@@ -60,9 +60,27 @@ async function parseJsonBody(req: IncomingMessage): Promise<unknown> {
     })
 }
 
+function parseCorsOrigins(): string[] {
+    const raw = process.env.CORS_ALLOWED_ORIGINS
+    if (!raw) return []
+    return raw.split(',').map(o => o.trim()).filter(Boolean)
+}
+
+function setCorsHeaders(req: IncomingMessage, res: ServerResponse, allowedOrigins: string[]): void {
+    const origin = req.headers.origin
+    if (!origin || !allowedOrigins.includes(origin)) return
+    res.setHeader('Access-Control-Allow-Origin', origin)
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, mcp-session-id, anthropic-version, x-api-key')
+    res.setHeader('Access-Control-Expose-Headers', 'mcp-session-id')
+    res.setHeader('Access-Control-Allow-Credentials', 'true')
+}
+
 export async function startHttpServer(options: StartHttpServerOptions = {}) {
     const host = options.host ?? process.env.HOST ?? '0.0.0.0'
     const port = options.port ?? Number(process.env.PORT ?? 3000)
+
+    const corsOrigins = parseCorsOrigins()
 
     const env = getEnv()
     const mode: ServerMode = env.SEATABLE_MODE
@@ -211,6 +229,15 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
         }
 
         const url = new URL(req.url, `http://${req.headers.host ?? 'localhost'}`)
+
+        // CORS handling
+        if (corsOrigins.length > 0) {
+            setCorsHeaders(req, res, corsOrigins)
+            if (req.method === 'OPTIONS') {
+                res.writeHead(204).end()
+                return
+            }
+        }
 
         if (url.pathname === '/mcp' && (req.method === 'POST' || req.method === 'GET' || req.method === 'DELETE')) {
             try {
