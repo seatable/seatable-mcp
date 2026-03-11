@@ -19,7 +19,7 @@ export const registerUpsertRows: ToolRegistrar = (server, { client, getInputSche
             description:
                 'Batch upsert rows by matching on one or more key columns. If a match exists, update it; otherwise insert a new row. Rejects unknown columns. Link and file/image columns cannot be set here — use link_rows/unlink_rows and upload_file instead.',
             inputSchema: getInputSchema(InputSchema),
-            annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+            annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         },
         async (args: unknown) => {
             const { table, key_columns, rows } = InputSchema.parse(args)

@@ -11,7 +11,7 @@ export const registerListBases: ToolRegistrar = (server, { baseNames }) => {
                 properties: {},
                 required: [],
             },
-            annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
+            annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
         },
         async () => {
             const names = baseNames ?? []

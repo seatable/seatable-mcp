@@ -21,7 +21,7 @@ export const registerUpdateRows: ToolRegistrar = (server, { client, getInputSche
             title: 'Update Rows',
             description: 'Batch update rows. Rejects unknown columns. Link and file/image columns cannot be modified here — use link_rows/unlink_rows and upload_file instead.',
             inputSchema: getInputSchema(InputSchema),
-            annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+            annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
         },
         async (args: unknown) => {
             const { table, updates } = InputSchema.parse(args)

@@ -16,7 +16,7 @@ export const registerListRows: ToolRegistrar = (server, { client, getInputSchema
             title: 'List Rows',
             description: 'List rows from a table with pagination (defaults: page=1, page_size=100). Use find_rows for filtering/sorting or query_sql for SQL queries.',
             inputSchema: getInputSchema(InputSchema),
-            annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
+            annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
         },
         async (args: unknown) => {
             const parsed = InputSchema.parse(args)

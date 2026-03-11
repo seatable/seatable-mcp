@@ -15,7 +15,7 @@ export const registerUnlinkRows: ToolRegistrar = (server, { client, getInputSche
       title: 'Unlink Rows',
       description: 'Remove links between rows via the dedicated links endpoint. This is the ONLY way to remove links — link columns cannot be modified via update_rows.',
       inputSchema: getInputSchema(InputSchema),
-      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
     async (args: unknown) => {
       const { table, link_column, pairs } = InputSchema.parse(args)

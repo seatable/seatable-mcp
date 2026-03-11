@@ -12,7 +12,7 @@ export const registerGetSchema: ToolRegistrar = (server, { client, getInputSchem
             title: 'Get Schema',
             description: 'Returns the normalized schema for the base',
             inputSchema: getInputSchema(InputSchema),
-            annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
+            annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
         },
         async () => {
             const metadata = await client.getMetadata()
