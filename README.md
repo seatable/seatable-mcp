@@ -254,6 +254,7 @@ The metrics server only starts in HTTP mode (not stdio) and binds to `0.0.0.0` �
 
 ### Utilities
 
+- **`create_snapshot`** — Create a snapshot of the current base (requires changes since last snapshot, 10 min cooldown)
 - **`add_select_options`** — Add new options to single-select or multi-select columns
 - **`ping_seatable`** — Health check with latency monitoring
 

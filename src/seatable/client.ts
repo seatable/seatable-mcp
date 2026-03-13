@@ -456,6 +456,20 @@ export class SeaTableClient {
         }
     }
 
+    // --- Snapshots ---
+
+    async createSnapshot(): Promise<{ status: string; snapshot: { dtable_uuid: string; dtable_name: string; commit_id: string; ctime: number } }> {
+        await this.ensureInitialized()
+        const dtableName = this.tokenManager.getDtableName()
+        if (!dtableName) {
+            throw new Error('Cannot determine base name. Ensure the token exchange returns dtable_name.')
+        }
+        return this.request('createSnapshot', async (http) => {
+            const res = await http.post('/snapshot/', { dtable_name: dtableName })
+            return res.data
+        })
+    }
+
     // --- File download ---
 
     private static readonly TEXT_EXTENSIONS = new Set([
@@ -523,10 +537,22 @@ export class SeaTableClient {
             }
 
             // 3. Extract the asset path from the full URL
-            // filePath is like "/workspace/1/asset/<uuid>/files/2024-01/report.pdf"
-            const assetMatch = filePath.match(/\/asset\/(.+)/)
-            if (!assetMatch) throw new Error(`Cannot extract asset path from "${filePath}"`)
-            const assetPath = `/${assetMatch[1]}` // e.g. "/files/2024-01/report.pdf" or with uuid prefix
+            // filePath may be relative ("/workspace/1/asset/<uuid>/files/2024-01/report.pdf")
+            // or absolute ("https://server/workspace/1/asset/<uuid>/files/2026-03/Request%20For%20Quotation.pdf")
+            // or an external URL ("https://example.com/image.png") for linked images
+            const decodedPath = decodeURIComponent(filePath)
+            const assetMatch = decodedPath.match(/\/asset\/(.+)/)
+            if (!assetMatch) {
+                // External URL — not a SeaTable asset, return the URL directly
+                return {
+                    file_name: resolvedFileName,
+                    file_size: 0,
+                    content: `External file. Use the download link to access it.`,
+                    content_type: 'binary_url' as const,
+                    download_link: filePath,
+                }
+            }
+            const assetPath = `/${assetMatch[1]}`
 
             // The download-link API expects a path like "/files/2024-01/report.pdf" or "/images/2024-01/photo.png"
             const pathMatch = assetPath.match(/\/((?:files|images)\/.+)/)

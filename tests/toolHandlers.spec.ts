@@ -189,4 +189,12 @@ describe('Tool handlers (mock integration)', () => {
         expect(data[0]).toHaveProperty('email')
         expect(data[0]).toHaveProperty('name')
     })
+
+    // --- create_snapshot ---
+
+    it('create_snapshot returns success message', async () => {
+        const result = await callTool(server, 'create_snapshot', {})
+        expect(result.isError).toBeUndefined()
+        expect(result.content[0].text).toContain('Snapshot created successfully')
+    })
 })

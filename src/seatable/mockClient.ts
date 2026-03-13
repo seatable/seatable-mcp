@@ -125,6 +125,18 @@ export class MockSeaTableClient {
     return { success: true }
   }
 
+  async createSnapshot(): Promise<{ status: string; snapshot: { dtable_uuid: string; dtable_name: string; commit_id: string; ctime: number } }> {
+    return {
+      status: 'created',
+      snapshot: {
+        dtable_uuid: 'mock-uuid',
+        dtable_name: 'Table1',
+        commit_id: 'abc123',
+        ctime: Date.now(),
+      },
+    }
+  }
+
   async uploadFile(args: {
     table: string; column: string; rowId: string;
     fileName: string; fileData: string; replace?: boolean

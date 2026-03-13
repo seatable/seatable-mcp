@@ -44,6 +44,9 @@ export interface ClientLike {
         fileName: string; fileData: string; replace?: boolean
     }): Promise<{ file_name: string; file_size: number; asset_url: string; column_type: string }>
 
+    // Snapshots
+    createSnapshot(): Promise<{ status: string; snapshot: { dtable_uuid: string; dtable_name: string; commit_id: string; ctime: number } }>
+
     // File download
     downloadFile(args: {
         table: string; column: string; rowId: string; fileName?: string

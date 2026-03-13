@@ -53,6 +53,9 @@ export class ContextualClient implements ClientLike {
     // Column options
     addColumnOptions(args: { table: string; column: string; options: Array<{ name: string; color?: string; textColor?: string }> }) { return this.client.addColumnOptions(args) }
 
+    // Snapshots
+    createSnapshot() { return this.client.createSnapshot() }
+
     // File upload
     uploadFile(args: { table: string; column: string; rowId: string; fileName: string; fileData: string; replace?: boolean }) { return this.client.uploadFile(args) }
 
