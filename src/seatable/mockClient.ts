@@ -30,7 +30,7 @@ export class MockSeaTableClient {
     }
   }
 
-  async listRows(query: { table: string; page?: number; page_size?: number; view?: string }): Promise<ListRowsResponse> {
+  async listRows(query: { table: string; page?: number; page_size?: number }): Promise<ListRowsResponse> {
     const t = this.tables.get(query.table)
     if (!t) return { rows: [] }
     const rows = Array.from(t.rows.values())

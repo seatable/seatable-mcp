@@ -18,7 +18,7 @@ export interface ClientLike {
     getMetadata(): Promise<any>
 
     // Rows
-    listRows(query: { table: string; page?: number; page_size?: number; view?: string }): Promise<{ rows: any[]; page?: number; page_size?: number; total?: number; has_more?: boolean }>
+    listRows(query: { table: string; page?: number; page_size?: number }): Promise<{ rows: any[]; page?: number; page_size?: number; total?: number; has_more?: boolean }>
     getRow(table: string, rowId: string): Promise<any>
     addRow(table: string, row: Record<string, unknown>): Promise<any>
     updateRow(table: string, rowId: string, row: Record<string, unknown>): Promise<any>

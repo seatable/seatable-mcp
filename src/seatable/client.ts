@@ -21,7 +21,6 @@ const ListRowsQuerySchema = z.object({
     table: z.string(),
     page: z.number().int().min(1).default(1),
     page_size: z.number().int().min(1).max(1000).default(100),
-    view: z.string().optional(),
 })
 export type ListRowsQuery = z.infer<typeof ListRowsQuerySchema>
 
@@ -151,7 +150,6 @@ export class SeaTableClient {
         table: string
         page?: number
         page_size?: number
-        view?: string
     }): Promise<ListRowsResponse> {
         const parsed = ListRowsQuerySchema.parse(query)
         return this.request('listRows', async (http) => {
@@ -161,7 +159,6 @@ export class SeaTableClient {
                 limit: parsed.page_size,
                 convert_keys: true,
             }
-            if (parsed.view) params.view_name = parsed.view
             const res = await http.get('/rows/', { params })
             const rows: SeaTableRow[] = res.data.rows ?? res.data
             return { rows, page: parsed.page, page_size: parsed.page_size, has_more: rows.length === parsed.page_size }

@@ -6,7 +6,6 @@ const InputSchema = z.object({
     table: z.string().describe('Table name'),
     page: z.number().int().min(1).default(1).describe('Page number (1-based)'),
     page_size: z.number().int().min(1).max(1000).default(100).describe('Rows per page (max 1000)'),
-    view: z.string().optional().describe('Optional SeaTable view name'),
 })
 
 export const registerListRows: ToolRegistrar = (server, { client, getInputSchema }) => {

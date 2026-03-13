@@ -33,7 +33,7 @@ export class ContextualClient implements ClientLike {
     getMetadata() { return this.client.getMetadata() }
 
     // Rows
-    listRows(query: { table: string; page?: number; page_size?: number; view?: string }) { return this.client.listRows(query) }
+    listRows(query: { table: string; page?: number; page_size?: number }) { return this.client.listRows(query) }
     getRow(table: string, rowId: string) { return this.client.getRow(table, rowId) }
     addRow(table: string, row: Record<string, unknown>) { return this.client.addRow(table, row) }
     updateRow(table: string, rowId: string, row: Record<string, unknown>) { return this.client.updateRow(table, rowId, row) }
