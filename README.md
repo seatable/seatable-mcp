@@ -242,7 +242,10 @@ The metrics server only starts in HTTP mode (not stdio) and binds to `0.0.0.0` �
 - **`update_rows`** — Batch update rows
 - **`upsert_rows`** — Insert or update rows by key columns
 - **`delete_rows`** — Remove rows by ID
+### Files
+
 - **`upload_file`** — Upload a file or image to a row (base64-encoded)
+- **`download_file`** — Read file content from a file or image column (text files and PDFs as text, binary files as download link, max 1 MB)
 
 ### Linking
 
@@ -274,7 +277,7 @@ SeaTable bases can contain many different column types. The following table show
 | Geolocation | Yes | `{"lat": 52.52, "lng": 13.40}` |
 | Collaborator | Yes | `["0b995819003140ed8e9efe05e817b000@auth.local"]` — use `list_collaborators` to get user IDs |
 | Link | Yes | Use `link_rows` / `unlink_rows` tools |
-| Image / File | Yes | Use `upload_file` tool with base64-encoded data |
+| Image / File | Yes | Use `upload_file` to upload (base64), `download_file` to read content |
 | Formula / Link Formula | No | Read-only, computed by SeaTable |
 | Creator / Created Time / Modified Time | No | Read-only, set automatically |
 | Auto Number | No | Read-only, set automatically |

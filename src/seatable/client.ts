@@ -456,6 +456,160 @@ export class SeaTableClient {
         }
     }
 
+    // --- File download ---
+
+    private static readonly TEXT_EXTENSIONS = new Set([
+        'txt', 'csv', 'md', 'json', 'xml', 'html', 'htm', 'css', 'js', 'ts',
+        'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf', 'log', 'sql', 'sh',
+        'py', 'rb', 'java', 'c', 'cpp', 'h', 'hpp', 'go', 'rs', 'swift',
+    ])
+
+    private static readonly MAX_FILE_SIZE = 1 * 1024 * 1024 // 1 MB
+
+    async downloadFile(args: {
+        table: string
+        column: string
+        rowId: string
+        fileName?: string
+    }): Promise<{ file_name: string; file_size: number; content: string; content_type: 'text' | 'pdf_text' | 'binary_url'; download_link?: string }> {
+        await this.ensureInitialized()
+        try {
+            const { table, column, rowId, fileName } = args
+
+            // 1. Validate column type via metadata
+            const metadata = await this.getMetadata()
+            const tableObj = (metadata.tables ?? []).find((t: any) => t.name === table)
+            if (!tableObj) throw new Error(`Table "${table}" not found`)
+            const colObj = (tableObj.columns ?? []).find((c: any) => c.name === column)
+            if (!colObj) throw new Error(`Column "${column}" not found in table "${table}"`)
+            if (colObj.type !== 'image' && colObj.type !== 'file') {
+                throw new Error(`Column "${column}" is type "${colObj.type}", expected "image" or "file"`)
+            }
+
+            // 2. Get the file entry from the row
+            const row = await this.getRow(table, rowId)
+            const columnValue = row[column]
+            if (!columnValue || (Array.isArray(columnValue) && columnValue.length === 0)) {
+                throw new Error(`No files found in column "${column}" for row "${rowId}"`)
+            }
+
+            let filePath: string
+            let resolvedFileName: string
+
+            if (colObj.type === 'image') {
+                // Image columns store an array of URL strings
+                const urls = columnValue as string[]
+                if (fileName) {
+                    const match = urls.find((u: string) => u.includes(fileName))
+                    if (!match) throw new Error(`File "${fileName}" not found in column "${column}"`)
+                    filePath = match
+                } else {
+                    filePath = urls[0]
+                }
+                resolvedFileName = filePath.split('/').pop() ?? 'unknown'
+            } else {
+                // File columns store an array of {name, size, type, url} objects
+                const files = columnValue as Array<{ name: string; url: string; size?: number }>
+                let fileObj: { name: string; url: string; size?: number }
+                if (fileName) {
+                    const match = files.find((f) => f.name === fileName)
+                    if (!match) throw new Error(`File "${fileName}" not found in column "${column}"`)
+                    fileObj = match
+                } else {
+                    fileObj = files[0]
+                }
+                filePath = fileObj.url
+                resolvedFileName = fileObj.name
+            }
+
+            // 3. Extract the asset path from the full URL
+            // filePath is like "/workspace/1/asset/<uuid>/files/2024-01/report.pdf"
+            const assetMatch = filePath.match(/\/asset\/(.+)/)
+            if (!assetMatch) throw new Error(`Cannot extract asset path from "${filePath}"`)
+            const assetPath = `/${assetMatch[1]}` // e.g. "/files/2024-01/report.pdf" or with uuid prefix
+
+            // The download-link API expects a path like "/files/2024-01/report.pdf" or "/images/2024-01/photo.png"
+            const pathMatch = assetPath.match(/\/((?:files|images)\/.+)/)
+            if (!pathMatch) throw new Error(`Cannot extract download path from "${assetPath}"`)
+            const downloadPath = `/${pathMatch[1]}`
+
+            // 4. Get download link
+            const downloadLink = await this.limiter.schedule(async () => {
+                const url = `${this.serverUrl}/api/v2.1/dtable/app-download-link/`
+                const res = await axios.get(url, {
+                    headers: { Authorization: `Token ${this.apiToken}` },
+                    params: { path: downloadPath },
+                    timeout: this.timeoutMs,
+                })
+                return res.data.download_link as string
+            })
+
+            // 5. Determine file type
+            const ext = resolvedFileName.split('.').pop()?.toLowerCase() ?? ''
+            const isText = SeaTableClient.TEXT_EXTENSIONS.has(ext)
+            const isPdf = ext === 'pdf'
+
+            if (!isText && !isPdf) {
+                // Binary file — return download link only
+                return {
+                    file_name: resolvedFileName,
+                    file_size: 0,
+                    content: `Binary file. Use the download link to access it.`,
+                    content_type: 'binary_url',
+                    download_link: downloadLink,
+                }
+            }
+
+            // 6. Download file content
+            const fileResponse = await this.limiter.schedule(async () => {
+                return axios.get(downloadLink, {
+                    responseType: 'arraybuffer',
+                    timeout: this.timeoutMs,
+                    maxContentLength: SeaTableClient.MAX_FILE_SIZE,
+                    maxBodyLength: SeaTableClient.MAX_FILE_SIZE,
+                })
+            })
+
+            const buffer = Buffer.from(fileResponse.data)
+            const fileSize = buffer.length
+
+            if (fileSize > SeaTableClient.MAX_FILE_SIZE) {
+                return {
+                    file_name: resolvedFileName,
+                    file_size: fileSize,
+                    content: `File exceeds 1 MB size limit (${(fileSize / 1024 / 1024).toFixed(1)} MB). Use the download link to access it.`,
+                    content_type: 'binary_url',
+                    download_link: downloadLink,
+                }
+            }
+
+            // 7. Extract text content
+            if (isPdf) {
+                const { PDFParse } = await import('pdf-parse')
+                const parser = new PDFParse({ data: new Uint8Array(buffer) })
+                const textResult = await parser.getText()
+                await parser.destroy()
+                return {
+                    file_name: resolvedFileName,
+                    file_size: fileSize,
+                    content: textResult.text,
+                    content_type: 'pdf_text',
+                }
+            }
+
+            // Text file
+            return {
+                file_name: resolvedFileName,
+                file_size: fileSize,
+                content: buffer.toString('utf-8'),
+                content_type: 'text',
+            }
+        } catch (err) {
+            logAxiosError(err, 'downloadFile')
+            throw toCodedAxiosError(err, 'downloadFile')
+        }
+    }
+
 }
 
 /** Create a client from environment variables (selfhosted mode). */

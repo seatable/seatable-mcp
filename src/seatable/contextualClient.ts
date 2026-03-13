@@ -55,4 +55,7 @@ export class ContextualClient implements ClientLike {
 
     // File upload
     uploadFile(args: { table: string; column: string; rowId: string; fileName: string; fileData: string; replace?: boolean }) { return this.client.uploadFile(args) }
+
+    // File download
+    downloadFile(args: { table: string; column: string; rowId: string; fileName?: string }) { return this.client.downloadFile(args) }
 }

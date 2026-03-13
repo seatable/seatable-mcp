@@ -43,6 +43,11 @@ export interface ClientLike {
         table: string; column: string; rowId: string;
         fileName: string; fileData: string; replace?: boolean
     }): Promise<{ file_name: string; file_size: number; asset_url: string; column_type: string }>
+
+    // File download
+    downloadFile(args: {
+        table: string; column: string; rowId: string; fileName?: string
+    }): Promise<{ file_name: string; file_size: number; content: string; content_type: 'text' | 'pdf_text' | 'binary_url'; download_link?: string }>
 }
 
 export type ToolDeps = { client: ClientLike; env: Env; getInputSchema: (schema: any) => any; baseNames?: string[] }

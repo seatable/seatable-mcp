@@ -136,4 +136,15 @@ export class MockSeaTableClient {
       column_type: 'image',
     }
   }
+
+  async downloadFile(args: {
+    table: string; column: string; rowId: string; fileName?: string
+  }): Promise<{ file_name: string; file_size: number; content: string; content_type: 'text' | 'pdf_text' | 'binary_url'; download_link?: string }> {
+    return {
+      file_name: args.fileName ?? 'mock-file.txt',
+      file_size: 13,
+      content: 'Mock content',
+      content_type: 'text',
+    }
+  }
 }

@@ -39,6 +39,7 @@ import { registerSearchRows } from './tools/searchRows.js'
 import type { ClientLike,McpServerLike } from './tools/types.js'
 import { registerUnlinkRows } from './tools/unlinkRows.js'
 import { registerUpdateRows } from './tools/updateRow.js'
+import { registerDownloadFile } from './tools/downloadFile.js'
 import { registerUploadFile } from './tools/uploadFile.js'
 import { registerUpsertRows } from './tools/upsertRows.js'
 
@@ -164,6 +165,7 @@ export class SeaTableMCPServer {
         registerQuerySql(serverAdapter, deps)
         registerListCollaborators(serverAdapter, deps)
         registerUploadFile(serverAdapter, deps)
+        registerDownloadFile(serverAdapter, deps)
         registerAddSelectOptions(serverAdapter, deps)
         registerPingSeatable(serverAdapter, deps)
 
