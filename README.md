@@ -229,7 +229,7 @@ The metrics server only starts in HTTP mode (not stdio) and binds to `0.0.0.0` �
 
 ### Reading Data
 
-- **`list_rows`** — Paginated row listing with sorting
+- **`list_rows`** — Paginated row listing (use query_sql for filtering/sorting)
 - **`get_row`** — Retrieve specific row by ID
 - **`find_rows`** — Client-side filtering with DSL
 - **`search_rows`** — Search via SQL WHERE clauses
@@ -291,7 +291,7 @@ SeaTable bases can contain many different column types. The following table show
 { "tool": "list_tables", "args": {} }
 
 // Get rows with pagination
-{ "tool": "list_rows", "args": { "table": "Tasks", "page_size": 10, "order_by": "_ctime", "direction": "desc" } }
+{ "tool": "list_rows", "args": { "table": "Tasks", "page_size": 10 } }
 
 // Add rows
 { "tool": "append_rows", "args": { "table": "Tasks", "rows": [{ "Title": "New Task", "Status": "Todo" }] } }
