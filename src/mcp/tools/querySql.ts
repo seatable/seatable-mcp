@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { cleanSqlMetadata } from './utils.js'
 import { ToolRegistrar } from './types.js'
 
 const InputSchema = z.object({
@@ -23,7 +24,7 @@ export const registerQuerySql: ToolRegistrar = (server, { client, getInputSchema
                 content: [{
                     type: 'text',
                     text: JSON.stringify({
-                        metadata: result.metadata,
+                        metadata: cleanSqlMetadata(result.metadata),
                         results: result.results,
                     }),
                 }],

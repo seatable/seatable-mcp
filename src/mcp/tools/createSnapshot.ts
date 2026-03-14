@@ -25,9 +25,6 @@ export const registerCreateSnapshot: ToolRegistrar = (server, { client, getInput
                 case 'time_is_short':
                     message = 'Snapshot not created: less than 10 minutes since the last snapshot. Please try again later.'
                     break
-                case 'dtable_not_changed':
-                    message = 'Snapshot not created: no changes since the last snapshot.'
-                    break
                 default:
                     message = `Snapshot status: ${result.status}`
             }
