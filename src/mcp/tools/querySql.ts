@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
-import { cleanSqlMetadata } from './utils.js'
 import { ToolRegistrar } from './types.js'
+import { cleanSqlMetadata } from './utils.js'
 
 const InputSchema = z.object({
     sql: z.string().describe('SQL query (SELECT, INSERT, UPDATE, DELETE)').refine(sql => sql.trim().length > 0, 'SQL query cannot be empty'),
