@@ -453,6 +453,17 @@ export class SeaTableClient {
         }
     }
 
+    // --- Row activities ---
+
+    async getRowActivities(rowId: string, page?: number): Promise<{ activities: any[]; total_count: number }> {
+        return this.request('getRowActivities', async (http) => {
+            const res = await http.get('/activities/', {
+                params: { row_id: rowId, page: page ?? 1, per_page: 25 },
+            })
+            return res.data
+        })
+    }
+
     // --- Snapshots ---
 
     async createSnapshot(): Promise<{ status: string; snapshot: { dtable_uuid: string; dtable_name: string; commit_id: string; ctime: number } }> {

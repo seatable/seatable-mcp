@@ -242,6 +242,7 @@ The metrics server only starts in HTTP mode (not stdio) and binds to `0.0.0.0` �
 - **`update_rows`** — Batch update rows
 - **`upsert_rows`** — Insert or update rows by key columns
 - **`delete_rows`** — Remove rows by ID
+
 ### Files
 
 - **`upload_file`** — Upload a file or image to a row (base64-encoded)
@@ -254,6 +255,7 @@ The metrics server only starts in HTTP mode (not stdio) and binds to `0.0.0.0` �
 
 ### Utilities
 
+- **`get_row_activities`** — Get change history of a row (who changed what, when, old/new values)
 - **`create_snapshot`** — Create a snapshot of the current base (requires changes since last snapshot, 10 min cooldown)
 - **`add_select_options`** — Add new options to single-select or multi-select columns
 - **`ping_seatable`** — Health check with latency monitoring

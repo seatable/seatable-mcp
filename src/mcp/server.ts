@@ -40,6 +40,7 @@ import type { ClientLike,McpServerLike } from './tools/types.js'
 import { registerUnlinkRows } from './tools/unlinkRows.js'
 import { registerUpdateRows } from './tools/updateRow.js'
 import { registerCreateSnapshot } from './tools/createSnapshot.js'
+import { registerGetRowActivities } from './tools/getRowActivities.js'
 import { registerDownloadFile } from './tools/downloadFile.js'
 import { registerUploadFile } from './tools/uploadFile.js'
 import { registerUpsertRows } from './tools/upsertRows.js'
@@ -175,6 +176,7 @@ export class SeaTableMCPServer {
         registerUploadFile(serverAdapter, deps)
         registerDownloadFile(serverAdapter, deps)
         registerCreateSnapshot(serverAdapter, deps)
+        registerGetRowActivities(serverAdapter, deps)
         registerAddSelectOptions(serverAdapter, deps)
         registerPingSeatable(serverAdapter, deps)
 

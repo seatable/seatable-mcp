@@ -53,6 +53,9 @@ export class ContextualClient implements ClientLike {
     // Column options
     addColumnOptions(args: { table: string; column: string; options: Array<{ name: string; color?: string; textColor?: string }> }) { return this.client.addColumnOptions(args) }
 
+    // Row activities
+    getRowActivities(rowId: string, page?: number) { return this.client.getRowActivities(rowId, page) }
+
     // Snapshots
     createSnapshot() { return this.client.createSnapshot() }
 

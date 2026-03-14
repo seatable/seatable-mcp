@@ -44,6 +44,9 @@ export interface ClientLike {
         fileName: string; fileData: string; replace?: boolean
     }): Promise<{ file_name: string; file_size: number; asset_url: string; column_type: string }>
 
+    // Row activities
+    getRowActivities(rowId: string, page?: number): Promise<{ activities: any[]; total_count: number }>
+
     // Snapshots
     createSnapshot(): Promise<{ status: string; snapshot: { dtable_uuid: string; dtable_name: string; commit_id: string; ctime: number } }>
 

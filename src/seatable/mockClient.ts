@@ -125,6 +125,24 @@ export class MockSeaTableClient {
     return { success: true }
   }
 
+  async getRowActivities(rowId: string, page?: number): Promise<{ activities: any[]; total_count: number }> {
+    return {
+      activities: [
+        {
+          op_user: 'admin@example.com',
+          op_type: 'modify_row',
+          op_time: '2026-03-12T10:00:00.000Z',
+          detail: {
+            table_name: 'Table1',
+            row_name: 'Test',
+            row_data: [{ column_name: 'Name', column_type: 'text', value: 'Updated', old_value: 'Original' }],
+          },
+        },
+      ],
+      total_count: 1,
+    }
+  }
+
   async createSnapshot(): Promise<{ status: string; snapshot: { dtable_uuid: string; dtable_name: string; commit_id: string; ctime: number } }> {
     return {
       status: 'created',
