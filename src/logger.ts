@@ -11,17 +11,20 @@ if (typeof process !== 'undefined' && process.versions?.node && !('WebSocketPair
     // Node.js environment: use pino without destination (v9 removed destination())
     const pinoModule = await import('pino')
     const pino: any = pinoModule.default
-    logger = pino({
-        level: process.env.LOG_LEVEL || 'info',
-        base: { service: 'seatable-mcp', version: pkg.version },
-        redact: ['req.headers.authorization', 'config.headers.Authorization'],
-        timestamp: pino?.stdTimeFunctions?.isoTime,
-        formatters: {
-            level(label: string) {
-                return { level: label.toUpperCase() }
+    logger = pino(
+        {
+            level: process.env.LOG_LEVEL || 'info',
+            base: { service: 'seatable-mcp', version: pkg.version },
+            redact: ['req.headers.authorization', 'config.headers.Authorization'],
+            timestamp: pino?.stdTimeFunctions?.isoTime,
+            formatters: {
+                level(label: string) {
+                    return { level: label.toUpperCase() }
+                },
             },
         },
-    }) as Logger
+        process.stderr,
+    ) as Logger
 } else {
     const createFallbackLogger = () => {
         const base: any = {

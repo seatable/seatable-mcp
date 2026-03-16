@@ -256,7 +256,7 @@ The metrics server only starts in HTTP mode (not stdio) and binds to `0.0.0.0` �
 ### Utilities
 
 - **`get_row_activities`** — Get change history of a row (who changed what, when, old/new values)
-- **`create_snapshot`** — Create a snapshot of the current base (requires changes since last snapshot, 10 min cooldown)
+- **`create_snapshot`** — Create a snapshot of the current base (10 min cooldown)
 - **`add_select_options`** — Add new options to single-select or multi-select columns
 - **`ping_seatable`** — Health check with latency monitoring
 
@@ -325,7 +325,7 @@ In-memory tables and rows for demos and tests without a live SeaTable instance.
 
 ### Prerequisites
 
-- Node.js >= 18
+- Node.js >= 20
 
 ### Setup
 
