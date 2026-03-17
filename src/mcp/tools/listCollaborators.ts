@@ -5,7 +5,7 @@ export const registerListCollaborators: ToolRegistrar = (server, { client }) => 
         'list_collaborators',
         {
             title: 'List Collaborators',
-            description: 'List users who have access to this base. Returns email (internal user ID) and display name. Use the email values when writing to collaborator columns.',
+            description: 'List users who have access to this base. Returns email (internal user ID) and display name. Use the email values when writing to collaborator columns. Call this once to resolve @auth.local addresses in collaborator columns before displaying them to the user.',
             inputSchema: {
                 type: 'object',
                 properties: {},
