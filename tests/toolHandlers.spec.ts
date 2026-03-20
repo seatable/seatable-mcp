@@ -130,7 +130,7 @@ describe('Tool handlers (mock integration)', () => {
         })
         expect(result.isError).toBeUndefined()
         const data = parseContent(result)
-        expect(data.rows[0].Name).toBe('Updated')
+        expect(data).toEqual({ success: true, updated_count: 1 })
     })
 
     // --- delete_rows ---
@@ -148,7 +148,7 @@ describe('Tool handlers (mock integration)', () => {
         })
         expect(result.isError).toBeUndefined()
         const data = parseContent(result)
-        expect(data.results[0]).toEqual({ row_id: _id, success: true })
+        expect(data).toEqual({ success: true, deleted_count: 1 })
     })
 
     it('delete_rows rejects >100 row_ids', async () => {

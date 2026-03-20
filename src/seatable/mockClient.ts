@@ -59,6 +59,14 @@ export class MockSeaTableClient {
     return newRow
   }
 
+  async addRows(table: string, rows: Array<Record<string, unknown>>): Promise<SeaTableRow[]> {
+    const results: SeaTableRow[] = []
+    for (const row of rows) {
+      results.push(await this.addRow(table, row))
+    }
+    return results
+  }
+
   async updateRow(table: string, rowId: string, row: Record<string, unknown>): Promise<SeaTableRow> {
     const t = this.tables.get(table)
     if (!t) throw new Error('mock: table not found')
@@ -69,10 +77,24 @@ export class MockSeaTableClient {
     return updated as SeaTableRow
   }
 
+  async updateRows(table: string, updates: Array<{ row_id: string; row: Record<string, unknown> }>): Promise<{ success: boolean }> {
+    for (const u of updates) {
+      await this.updateRow(table, u.row_id, u.row)
+    }
+    return { success: true }
+  }
+
   async deleteRow(table: string, rowId: string): Promise<{ success: boolean }> {
     const t = this.tables.get(table)
     if (!t) return { success: false }
     t.rows.delete(rowId)
+    return { success: true }
+  }
+
+  async deleteRows(table: string, rowIds: string[]): Promise<{ success: boolean }> {
+    for (const id of rowIds) {
+      await this.deleteRow(table, id)
+    }
     return { success: true }
   }
 

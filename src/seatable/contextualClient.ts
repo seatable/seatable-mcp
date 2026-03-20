@@ -44,8 +44,11 @@ export class ContextualClient implements ClientLike {
     listRows(query: { table: string; page?: number; page_size?: number }) { return this.client.listRows(query) }
     getRow(table: string, rowId: string) { return this.client.getRow(table, rowId) }
     addRow(table: string, row: Record<string, unknown>) { return this.client.addRow(table, row) }
+    addRows(table: string, rows: Array<Record<string, unknown>>) { return this.client.addRows(table, rows) }
     updateRow(table: string, rowId: string, row: Record<string, unknown>) { return this.client.updateRow(table, rowId, row) }
+    updateRows(table: string, updates: Array<{ row_id: string; row: Record<string, unknown> }>) { return this.client.updateRows(table, updates) }
     deleteRow(table: string, rowId: string) { return this.client.deleteRow(table, rowId) }
+    deleteRows(table: string, rowIds: string[]) { return this.client.deleteRows(table, rowIds) }
     searchRows(table: string, query: Record<string, unknown>) { return this.client.searchRows(table, query) }
 
     // SQL

@@ -33,13 +33,11 @@ export const registerUpdateRows: ToolRegistrar = (server, { client, getInputSche
                 updates.map((u: z.infer<typeof UpdateItem>) => u.values)
             )
 
-            const results = [] as any[]
-            for (const u of updates) {
-                await client.updateRow(table, u.row_id, u.values)
-                const fresh = await client.getRow(table, u.row_id)
-                results.push(fresh)
-            }
-            const content: Array<{ type: 'text'; text: string }> = [{ type: 'text', text: JSON.stringify({ rows: results }) }]
+            await client.updateRows(
+                table,
+                updates.map((u: z.infer<typeof UpdateItem>) => ({ row_id: u.row_id, row: u.values }))
+            )
+            const content: Array<{ type: 'text'; text: string }> = [{ type: 'text', text: JSON.stringify({ success: true, updated_count: updates.length }) }]
             if (strippedReadOnly.length) {
                 content.push({ type: 'text', text: `Note: Read-only columns were ignored: ${strippedReadOnly.join(', ')}` })
             }

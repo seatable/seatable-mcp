@@ -21,8 +21,11 @@ export interface ClientLike {
     listRows(query: { table: string; page?: number; page_size?: number }): Promise<{ rows: any[]; page?: number; page_size?: number; total?: number; has_more?: boolean }>
     getRow(table: string, rowId: string): Promise<any>
     addRow(table: string, row: Record<string, unknown>): Promise<any>
+    addRows(table: string, rows: Array<Record<string, unknown>>): Promise<any[]>
     updateRow(table: string, rowId: string, row: Record<string, unknown>): Promise<any>
+    updateRows(table: string, updates: Array<{ row_id: string; row: Record<string, unknown> }>): Promise<{ success: boolean }>
     deleteRow(table: string, rowId: string): Promise<{ success: boolean }>
+    deleteRows(table: string, rowIds: string[]): Promise<{ success: boolean }>
     searchRows(table: string, query: Record<string, unknown>): Promise<{ rows: any[]; page?: number; page_size?: number; total?: number; has_more?: boolean }>
 
     // SQL

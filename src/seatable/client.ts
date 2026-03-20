@@ -185,6 +185,17 @@ export class SeaTableClient {
         })
     }
 
+    async addRows(table: string, rows: Array<Record<string, unknown>>): Promise<SeaTableRow[]> {
+        return this.request('addRows', async (http) => {
+            const res = await http.post('/rows/', {
+                table_name: table,
+                rows,
+                convert_keys: true,
+            })
+            return res.data.rows ?? res.data
+        })
+    }
+
     async updateRow(table: string, rowId: string, row: Record<string, unknown>): Promise<any> {
         return this.request('updateRow', async (http) => {
             const res = await http.put('/rows/', {
@@ -195,10 +206,29 @@ export class SeaTableClient {
         })
     }
 
+    async updateRows(table: string, updates: Array<{ row_id: string; row: Record<string, unknown> }>): Promise<{ success: boolean }> {
+        return this.request('updateRows', async (http) => {
+            const res = await http.put('/rows/', {
+                table_name: table,
+                updates,
+            })
+            return res.data
+        })
+    }
+
     async deleteRow(table: string, rowId: string): Promise<{ success: boolean }> {
         return this.request('deleteRow', async (http) => {
             const res = await http.delete('/rows/', {
                 data: { table_name: table, row_ids: [rowId] },
+            })
+            return res.data
+        })
+    }
+
+    async deleteRows(table: string, rowIds: string[]): Promise<{ success: boolean }> {
+        return this.request('deleteRows', async (http) => {
+            const res = await http.delete('/rows/', {
+                data: { table_name: table, row_ids: rowIds },
             })
             return res.data
         })

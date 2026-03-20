@@ -109,6 +109,7 @@ export class SeaTableMCPServer {
                     'Terminology: use "base" (not database), "table" (not sheet), "row" (not record/entry), "column" (not field), "link" (not relation/relationship).',
                     'Views are not supported. All tools return all columns. Filter and sort client-side using find_rows or query_sql.',
                     'Prefer query_sql for reading, updating, and deleting data. It supports SELECT, UPDATE...WHERE, and DELETE...WHERE in a single call — much more efficient than fetching row IDs first. SELECT returns max 10,000 rows (vs. list_rows max 1,000 per page). Columns not writable via SQL: image, file, formula, link, geolocation, auto-number, button.',
+                    'Always prefer batch tools (append_rows, update_rows, delete_rows) over calling single-row tools in a loop. Batch tools are significantly faster.',
                     'Collaborator columns contain @auth.local addresses (internal user IDs). Call list_collaborators once to get a mapping of emails to display names, then reuse that mapping — do not call it repeatedly.',
                 ].join('\n'),
             },

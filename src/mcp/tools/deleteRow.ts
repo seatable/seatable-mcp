@@ -18,12 +18,8 @@ export const registerDeleteRows: ToolRegistrar = (server, { client, getInputSche
         },
         async (args: unknown) => {
             const { table, row_ids } = InputSchema.parse(args)
-            const results = []
-            for (const row_id of row_ids) {
-                const res = await client.deleteRow(table, row_id)
-                results.push({ row_id, success: res.success })
-            }
-            return { content: [{ type: 'text', text: JSON.stringify({ results }) }] }
+            await client.deleteRows(table, row_ids)
+            return { content: [{ type: 'text', text: JSON.stringify({ success: true, deleted_count: row_ids.length }) }] }
         }
     )
 }
