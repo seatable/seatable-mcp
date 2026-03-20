@@ -39,6 +39,8 @@ export class SeaTableClient {
     private http?: AxiosInstance
     private initialized = false
     private initializing?: Promise<void>
+    private metadataCache?: { data: any; expiresAt: number }
+    private static readonly METADATA_CACHE_TTL_MS = 60_000 // 60 seconds
 
     constructor(config: SeaTableClientConfig) {
         this.serverUrl = config.serverUrl.replace(/\/$/, '')
@@ -133,10 +135,19 @@ export class SeaTableClient {
     // --- Metadata & Tables ---
 
     async getMetadata(): Promise<any> {
-        return this.request('getMetadata', async (http) => {
+        if (this.metadataCache && Date.now() < this.metadataCache.expiresAt) {
+            return this.metadataCache.data
+        }
+        const data = await this.request('getMetadata', async (http) => {
             const res = await http.get('/metadata/')
             return res.data.metadata ?? res.data
         })
+        this.metadataCache = { data, expiresAt: Date.now() + SeaTableClient.METADATA_CACHE_TTL_MS }
+        return data
+    }
+
+    clearMetadataCache(): void {
+        this.metadataCache = undefined
     }
 
     async listTables(): Promise<SeaTableTable[]> {

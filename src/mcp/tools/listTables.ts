@@ -53,6 +53,7 @@ export const registerListTables: ToolRegistrar = (server, { client, getInputSche
         },
         async (_args: unknown) => {
             InputSchema.parse({})
+            client.clearMetadataCache?.()
             const metadata = await client.getMetadata()
             const tables = metadata.tables ?? []
             return { content: [{ type: 'text', text: JSON.stringify(cleanTables(tables)) }] }

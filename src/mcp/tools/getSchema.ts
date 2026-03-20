@@ -15,6 +15,7 @@ export const registerGetSchema: ToolRegistrar = (server, { client, getInputSchem
             annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         },
         async () => {
+            client.clearMetadataCache?.()
             const metadata = await client.getMetadata()
             const generic = mapMetadataToGeneric(metadata)
             return { content: [{ type: 'text', text: JSON.stringify(generic) }] }

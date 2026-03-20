@@ -39,6 +39,7 @@ export class ContextualClient implements ClientLike {
 
     // Metadata
     getMetadata() { return this.client.getMetadata() }
+    clearMetadataCache() { this.client.clearMetadataCache?.() }
 
     // Rows
     listRows(query: { table: string; page?: number; page_size?: number }) { return this.client.listRows(query) }

@@ -16,6 +16,7 @@ export interface ClientLike {
 
     // Metadata
     getMetadata(): Promise<any>
+    clearMetadataCache?(): void
 
     // Rows
     listRows(query: { table: string; page?: number; page_size?: number }): Promise<{ rows: any[]; page?: number; page_size?: number; total?: number; has_more?: boolean }>
