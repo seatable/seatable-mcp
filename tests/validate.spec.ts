@@ -58,14 +58,15 @@ describe('validateRowsAgainstSchema', () => {
 
   // Read-only column stripping
   describe('read-only columns', () => {
-    it('strips formula columns silently', () => {
+    it('strips formula columns and reports them', () => {
       const rows = [{ Title: 'A', Formula: 'computed' }]
       const res = validateRowsAgainstSchema(schema, 'Tasks', rows)
       expect(rows[0]).not.toHaveProperty('Formula')
       expect(res.unknownColumns).toEqual([])
+      expect(res.strippedReadOnly).toEqual(['Formula'])
     })
 
-    it('strips all read-only types', () => {
+    it('strips all read-only types and reports them', () => {
       const rows = [{
         Title: 'A',
         Creator: 'user@test.com',
@@ -77,8 +78,18 @@ describe('validateRowsAgainstSchema', () => {
         DigSign: 'sig',
         Link: 'linked',
       }]
-      validateRowsAgainstSchema(schema, 'Tasks', rows)
+      const res = validateRowsAgainstSchema(schema, 'Tasks', rows)
       expect(Object.keys(rows[0])).toEqual(['Title'])
+      expect(res.strippedReadOnly).toEqual(
+        expect.arrayContaining(['Creator', 'Created', 'Modified', 'AutoNum', 'Btn', 'LinkFormula', 'DigSign', 'Link'])
+      )
+      expect(res.strippedReadOnly).toHaveLength(8)
+    })
+
+    it('returns empty strippedReadOnly when no read-only columns present', () => {
+      const rows = [{ Title: 'A' }]
+      const res = validateRowsAgainstSchema(schema, 'Tasks', rows)
+      expect(res.strippedReadOnly).toEqual([])
     })
   })
 

@@ -27,7 +27,7 @@ export const registerUpdateRows: ToolRegistrar = (server, { client, getInputSche
             const { table, updates } = InputSchema.parse(args)
             const metadata = await client.getMetadata()
             const generic = mapMetadataToGeneric(metadata)
-            validateRowsAgainstSchema(
+            const { strippedReadOnly } = validateRowsAgainstSchema(
                 generic,
                 table,
                 updates.map((u: z.infer<typeof UpdateItem>) => u.values)
@@ -39,7 +39,11 @@ export const registerUpdateRows: ToolRegistrar = (server, { client, getInputSche
                 const fresh = await client.getRow(table, u.row_id)
                 results.push(fresh)
             }
-            return { content: [{ type: 'text', text: JSON.stringify({ rows: results }) }] }
+            const content: Array<{ type: 'text'; text: string }> = [{ type: 'text', text: JSON.stringify({ rows: results }) }]
+            if (strippedReadOnly.length) {
+                content.push({ type: 'text', text: `Note: Read-only columns were ignored: ${strippedReadOnly.join(', ')}` })
+            }
+            return { content }
         }
     )
 }

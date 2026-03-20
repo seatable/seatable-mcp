@@ -25,7 +25,7 @@ export function validateRowsAgainstSchema(
     tableName: string,
     rows: Array<Record<string, unknown>>,
     opts?: Partial<ValidateOptions>
-): { rows: Array<Record<string, unknown>>; unknownColumns: string[] } {
+): { rows: Array<Record<string, unknown>>; unknownColumns: string[]; strippedReadOnly: string[] } {
     const options = ValidateOptionsSchema.parse({ allowCreateColumns: false, ...(opts || {}) })
     const table = schema.tables.find((t) => t.name === tableName)
     if (!table) {
@@ -39,13 +39,15 @@ export function validateRowsAgainstSchema(
 
     const allowed = new Set(table.columns.map((c) => c.name))
     const unknown = new Set<string>()
+    const stripped = new Set<string>()
 
     for (const row of rows) {
-        // Strip read-only columns silently
+        // Strip read-only columns and track them
         for (const key of Object.keys(row)) {
             const col = columnMap.get(key)
             if (col && READ_ONLY_TYPES.has(col.type)) {
                 delete row[key]
+                stripped.add(key)
             }
         }
 
@@ -83,7 +85,7 @@ export function validateRowsAgainstSchema(
         })
     }
 
-    return { rows, unknownColumns }
+    return { rows, unknownColumns, strippedReadOnly: Array.from(stripped) }
 }
 
 function coerceCheckbox(colName: string, value: unknown): boolean {

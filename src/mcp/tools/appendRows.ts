@@ -22,14 +22,18 @@ export const registerAppendRows: ToolRegistrar = (server, { client, getInputSche
             const { table, rows } = InputSchema.parse(args)
             const metadata = await client.getMetadata()
             const generic = mapMetadataToGeneric(metadata)
-            validateRowsAgainstSchema(generic, table, rows)
+            const { strippedReadOnly } = validateRowsAgainstSchema(generic, table, rows)
 
             const results = []
             for (const row of rows) {
                 const res = await client.addRow(table, row)
                 results.push(res)
             }
-            return { content: [{ type: 'text', text: JSON.stringify({ rows: results }) }] }
+            const content: Array<{ type: 'text'; text: string }> = [{ type: 'text', text: JSON.stringify({ rows: results }) }]
+            if (strippedReadOnly.length) {
+                content.push({ type: 'text', text: `Note: Read-only columns were ignored: ${strippedReadOnly.join(', ')}` })
+            }
+            return { content }
         }
     )
 }

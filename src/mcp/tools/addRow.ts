@@ -22,9 +22,13 @@ export const registerAddRow: ToolRegistrar = (server, { client, getInputSchema }
             const { table, row } = InputSchema.parse(args)
             const metadata = await client.getMetadata()
             const generic = mapMetadataToGeneric(metadata)
-            validateRowsAgainstSchema(generic, table, [row])
+            const { strippedReadOnly } = validateRowsAgainstSchema(generic, table, [row])
             const created = await client.addRow(table, row)
-            return { content: [{ type: 'text', text: JSON.stringify(created) }] }
+            const content: Array<{ type: 'text'; text: string }> = [{ type: 'text', text: JSON.stringify(created) }]
+            if (strippedReadOnly.length) {
+                content.push({ type: 'text', text: `Note: Read-only columns were ignored: ${strippedReadOnly.join(', ')}` })
+            }
+            return { content }
         }
     )
 }
