@@ -619,14 +619,12 @@ export class SeaTableClient {
 
             // 7. Extract text content
             if (isPdf) {
-                const { PDFParse } = await import('pdf-parse')
-                const parser = new PDFParse({ data: new Uint8Array(buffer) })
-                const textResult = await parser.getText()
-                await parser.destroy()
+                const { extractText } = await import('unpdf')
+                const result = await extractText(new Uint8Array(buffer))
                 return {
                     file_name: resolvedFileName,
                     file_size: fileSize,
-                    content: textResult.text,
+                    content: result.text.join('\n'),
                     content_type: 'pdf_text',
                 }
             }
