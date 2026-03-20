@@ -173,6 +173,12 @@ The security characteristics differ significantly between transport modes:
 
 > **⚠️ Warning:** Selfhosted HTTP mode (`--sse` / `--http`) has **no authentication**. Anyone who can reach the port gets full access to all configured bases, including write and delete operations. Only run it in trusted networks (localhost, Docker-internal) or behind a reverse proxy that handles authentication. For untrusted networks, use **managed mode** instead.
 
+### Rate Limiting
+
+SeaTable's own API gateway enforces rate limits **per base** (default: 500 requests/minute per `base_uuid`) and **per organization** (monthly quota). These limits apply regardless of whether requests come from the MCP server, the web UI, or direct API calls. The MCP server does not duplicate these limits — instead, it retries automatically with exponential backoff when SeaTable returns `429 Too Many Requests`.
+
+In **managed mode**, the MCP server adds its own rate limits to protect the server process itself (not the SeaTable backend): 60 req/min per token, 120/min per IP, 30/min for new session creation, and 20 concurrent connections per token.
+
 ## Environment Variables
 
 Required:
