@@ -185,6 +185,10 @@ All tool inputs are validated with Zod schemas before execution. Write tools (`a
 
 Tool schemas are published with `additionalProperties: true` to remain compatible with MCP clients that may attach internal fields (e.g. `_meta`). Unexpected fields are ignored by the server — they do not cause errors but are not processed either. This is a deliberate trade-off: stricter validation would improve error messages for typos but risk breaking compatibility with MCP clients.
 
+### Row Responses
+
+Row responses include all columns and SeaTable system fields (`_id`, `_mtime`, `_ctime`, `_creator`, `_last_modifier`). System fields are not filtered — `_id` is required for updates and deletes, timestamps are useful for sorting and freshness checks, and creator/modifier fields can be resolved to display names via `list_collaborators`.
+
 ### Caching
 
 The server caches base metadata (table/column definitions) for 60 seconds to avoid redundant API calls during write operations. Schema-reading tools (`get_schema`, `list_tables`) always bypass the cache and return fresh data. If a cached schema becomes stale (e.g. a column was renamed), the SeaTable API will reject the write and the AI agent can call `get_schema` to refresh.
