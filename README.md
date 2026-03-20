@@ -179,6 +179,12 @@ SeaTable's own API gateway enforces rate limits **per base** (default: 500 reque
 
 In **managed mode**, the MCP server adds its own rate limits to protect the server process itself (not the SeaTable backend): 60 req/min per token, 120/min per IP, 30/min for new session creation, and 20 concurrent connections per token.
 
+### Input Validation
+
+All tool inputs are validated with Zod schemas before execution. Write tools (`add_row`, `append_rows`, `update_rows`, `upsert_rows`) additionally validate row data against the table schema — unknown columns are rejected, and read-only columns (formula, auto-number, creator, etc.) are stripped with a note in the response.
+
+Tool schemas are published with `additionalProperties: true` to remain compatible with MCP clients that may attach internal fields (e.g. `_meta`). Unexpected fields are ignored by the server — they do not cause errors but are not processed either. This is a deliberate trade-off: stricter validation would improve error messages for typos but risk breaking compatibility with MCP clients.
+
 ## Environment Variables
 
 Required:

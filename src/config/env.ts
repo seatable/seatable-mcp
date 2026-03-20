@@ -28,7 +28,7 @@ const EnvSchema = z
             .string()
             .optional()
             .transform((v) => (v ? Number(v) : undefined))
-            .pipe(z.number().int().positive().optional()),
+            .pipe(z.number().int().positive().max(120_000).optional()),
         SEATABLE_MOCK: z
             .string()
             .optional()
