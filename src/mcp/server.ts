@@ -242,13 +242,14 @@ export class SeaTableMCPServer {
         const start = Date.now()
         toolCallsByToolTotal.inc({ tool: toolName })
         try {
-            // Multi-base: extract base param and set on contextual client
-            if (this.contextualClient) {
-                const args = request.params.arguments as Record<string, unknown> | undefined
-                const baseName = args?.base as string | undefined
-                this.contextualClient.setBase(baseName)
-            }
-            const result = await tool.handler(request.params.arguments)
+            // Wrap handler to support thread-safe multi-base routing via AsyncLocalStorage
+            const runHandler = () => tool.handler(request.params.arguments)
+            const result = this.contextualClient
+                ? await this.contextualClient.runWithBase(
+                    (request.params.arguments as Record<string, unknown> | undefined)?.base as string | undefined,
+                    runHandler
+                  )
+                : await runHandler()
             const durationMs = Date.now() - start
             const durationSec = durationMs / 1000
             const baseInfo = this.client.getBaseInfo?.() ?? {}

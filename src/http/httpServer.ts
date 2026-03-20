@@ -87,7 +87,10 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
     const tokenValidator = mode === 'managed' ? new TokenValidator(env.SEATABLE_SERVER_URL) : undefined
     const rateLimiter = mode === 'managed' ? new RateLimitManager() : undefined
 
-    const oauthProvider = mode === 'managed' ? new OAuthProvider(process.env.SEATABLE_MCP_HOSTNAME) : undefined
+    const oauthProvider = mode === 'managed' ? new OAuthProvider({
+        hostname: process.env.SEATABLE_MCP_HOSTNAME,
+        validateToken: tokenValidator ? (token) => tokenValidator.validate(token) : undefined,
+    }) : undefined
 
     const toolDefinitions = getStaticToolDefinitions()
     const sessions = new Map<string, ActiveSession>()
@@ -98,9 +101,13 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
         return auth.startsWith('Bearer ') ? auth.slice(7) : auth
     }
 
+    const trustProxy = env.TRUST_PROXY ?? true
+
     function getClientIp(req: IncomingMessage): string {
-        const forwarded = req.headers['x-forwarded-for']
-        if (typeof forwarded === 'string') return forwarded.split(',')[0].trim()
+        if (trustProxy) {
+            const forwarded = req.headers['x-forwarded-for']
+            if (typeof forwarded === 'string') return forwarded.split(',')[0].trim()
+        }
         return req.socket.remoteAddress ?? 'unknown'
     }
 
@@ -130,6 +137,20 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
 
         // For POST without session ID: this is an initialization request → new session
         if (req.method === 'POST' && !sessionId) {
+            // Pre-auth rate limiting: cap new session creation per IP to prevent token-validation flooding
+            if (rateLimiter) {
+                const preAuthResult = rateLimiter.preAuth.check(getClientIp(req))
+                if (!preAuthResult.allowed) {
+                    logger.warn({ ip: getClientIp(req) }, 'Pre-auth rate limit exceeded')
+                    const retryAfter = Math.ceil(preAuthResult.retryAfterMs / 1000)
+                    res.writeHead(429, {
+                        'content-type': 'text/plain',
+                        'retry-after': String(retryAfter),
+                    }).end('Too many authentication attempts')
+                    return
+                }
+            }
+
             // In managed mode: require and validate Bearer token
             let apiToken: string | undefined
             if (mode === 'managed') {
@@ -219,6 +240,10 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
     }
 
     const server = createServer(async (req, res) => {
+        // Security headers on every response
+        res.setHeader('X-Content-Type-Options', 'nosniff')
+        res.setHeader('X-Frame-Options', 'DENY')
+
         res.on('finish', () => {
             httpRequestsTotal.inc({ method: req.method ?? 'UNKNOWN', status: String(res.statusCode) })
         })

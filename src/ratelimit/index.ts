@@ -22,6 +22,8 @@ export class RateLimitManager {
     readonly perToken = new SlidingWindowLimiter(60, ONE_MINUTE)
     readonly perIp = new SlidingWindowLimiter(120, ONE_MINUTE)
     readonly global = new SlidingWindowLimiter(5000, ONE_MINUTE)
+    /** Pre-auth limiter: caps new session creation per IP to prevent token-validation flooding */
+    readonly preAuth = new SlidingWindowLimiter(30, ONE_MINUTE)
     readonly connections = new ConnectionCounter(20)
 
     private cleanupInterval?: ReturnType<typeof setInterval>
@@ -67,6 +69,7 @@ export class RateLimitManager {
         this.perToken.cleanup()
         this.perIp.cleanup()
         this.global.cleanup()
+        this.preAuth.cleanup()
     }
 
     destroy(): void {

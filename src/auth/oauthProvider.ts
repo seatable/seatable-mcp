@@ -14,13 +14,21 @@ interface AuthorizationCode {
 const CODE_TTL_MS = 5 * 60 * 1000 // 5 minutes
 const CLEANUP_INTERVAL_MS = 60 * 1000
 
+export interface OAuthProviderOptions {
+    hostname?: string
+    /** Optional callback to validate an API token before issuing an authorization code. */
+    validateToken?: (token: string) => Promise<boolean>
+}
+
 export class OAuthProvider {
     private readonly codes = new Map<string, AuthorizationCode>()
     private readonly cleanupInterval: ReturnType<typeof setInterval>
     private readonly configuredHostname?: string
+    private readonly validateToken?: (token: string) => Promise<boolean>
 
-    constructor(hostname?: string) {
-        this.configuredHostname = hostname
+    constructor(options?: OAuthProviderOptions) {
+        this.configuredHostname = options?.hostname
+        this.validateToken = options?.validateToken
         this.cleanupInterval = setInterval(() => this.cleanup(), CLEANUP_INTERVAL_MS)
         if (this.cleanupInterval.unref) {
             this.cleanupInterval.unref()
@@ -122,6 +130,17 @@ export class OAuthProvider {
                 return
             }
 
+            // Validate token against SeaTable before issuing a code
+            if (this.validateToken) {
+                const valid = await this.validateToken(apiToken)
+                if (!valid) {
+                    logger.warn('OAuth authorization rejected: invalid API token')
+                    res.writeHead(400, { 'content-type': 'text/html; charset=utf-8' })
+                    res.end(this.renderAuthorizePage(clientId, formRedirectUri, formState, responseType, formCodeChallenge, formCodeChallengeMethod, 'Invalid API token. Please check your token and try again.'))
+                    return
+                }
+            }
+
             if (!formRedirectUri) {
                 res.writeHead(400, { 'content-type': 'text/plain' }).end('Missing redirect_uri')
                 return
@@ -175,7 +194,7 @@ export class OAuthProvider {
                     .end(JSON.stringify({ error: 'invalid_request', error_description: 'Missing refresh_token' }))
                 return
             }
-            res.writeHead(200, { 'content-type': 'application/json' })
+            res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
             res.end(JSON.stringify({
                 access_token: refreshToken,
                 token_type: 'Bearer',
@@ -243,7 +262,7 @@ export class OAuthProvider {
         logger.info('OAuth token exchange successful')
 
         // Return the API token as the OAuth access token
-        res.writeHead(200, { 'content-type': 'application/json' })
+        res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
         res.end(JSON.stringify({
             access_token: stored.apiToken,
             token_type: 'Bearer',

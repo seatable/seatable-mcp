@@ -46,6 +46,14 @@ const EnvSchema = z
             .optional()
             .transform((v) => (v === '1' || v === 'true' ? true : false))
             .optional(),
+        // Trust X-Forwarded-For header for client IP extraction (default: true).
+        // Set to false if the server is directly exposed without a reverse proxy.
+        TRUST_PROXY: z
+            .string()
+            .optional()
+            .transform((v) => v !== '0' && v !== 'false')
+            .optional()
+            .default('true'),
     })
     .superRefine((data, ctx) => {
         if (data.SEATABLE_MODE === 'selfhosted' && !data.SEATABLE_API_TOKEN && !data.SEATABLE_BASES) {

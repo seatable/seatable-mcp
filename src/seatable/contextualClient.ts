@@ -1,26 +1,34 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
+
 import type { ClientLike } from '../mcp/tools/types.js'
 import type { ClientRegistry } from './clientRegistry.js'
 
+const baseContext = new AsyncLocalStorage<string | undefined>()
+
 /**
  * A ClientLike proxy that delegates to a specific base client
- * based on the currently set base name. This avoids modifying
- * every tool file — the base parameter is extracted centrally
- * in handleCallTool() and applied via setBase().
+ * based on the async context set via runWithBase(). This ensures
+ * thread-safe routing even with concurrent tool calls — each call
+ * gets its own isolated base context via AsyncLocalStorage.
  */
 export class ContextualClient implements ClientLike {
     private readonly registry: ClientRegistry
-    private currentBase?: string
 
     constructor(registry: ClientRegistry) {
         this.registry = registry
     }
 
-    setBase(name?: string): void {
-        this.currentBase = name
+    /**
+     * Run a function with the given base name bound to the async context.
+     * All client method calls within `fn` (including across await boundaries)
+     * will route to the specified base.
+     */
+    runWithBase<T>(name: string | undefined, fn: () => T): T {
+        return baseContext.run(name, fn)
     }
 
     private get client(): ClientLike {
-        return this.registry.resolve(this.currentBase)
+        return this.registry.resolve(baseContext.getStore())
     }
 
     // Base info

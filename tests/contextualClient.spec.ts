@@ -46,16 +46,14 @@ function createMockClient(baseName: string): ClientLike {
 }
 
 describe('ContextualClient', () => {
-    it('delegates to the correct base after setBase()', async () => {
+    it('delegates to the correct base via runWithBase()', async () => {
         const registry = createMockRegistry(['CRM', 'Projects'])
         const ctx = new ContextualClient(registry as any)
 
-        ctx.setBase('CRM')
-        const crmTables = await ctx.listTables()
+        const crmTables = await ctx.runWithBase('CRM', () => ctx.listTables())
         expect(crmTables[0].name).toBe('Table_CRM')
 
-        ctx.setBase('Projects')
-        const projTables = await ctx.listTables()
+        const projTables = await ctx.runWithBase('Projects', () => ctx.listTables())
         expect(projTables[0].name).toBe('Table_Projects')
     })
 
@@ -63,8 +61,8 @@ describe('ContextualClient', () => {
         const registry = createMockRegistry(['OnlyBase'])
         const ctx = new ContextualClient(registry as any)
 
-        // No setBase call — should resolve to the single base
-        const tables = await ctx.listTables()
+        // No base specified — should resolve to the single base
+        const tables = await ctx.runWithBase(undefined, () => ctx.listTables())
         expect(tables[0].name).toBe('Table_OnlyBase')
     })
 
@@ -73,48 +71,59 @@ describe('ContextualClient', () => {
         const ctx = new ContextualClient(registry as any)
 
         // The getter throws synchronously when resolving the client
-        expect(() => ctx.listTables()).toThrow('Specify "base" parameter')
+        expect(() => ctx.runWithBase(undefined, () => ctx.listTables())).toThrow('Specify "base" parameter')
     })
 
     it('throws for unknown base name', () => {
         const registry = createMockRegistry(['CRM'])
         const ctx = new ContextualClient(registry as any)
 
-        ctx.setBase('Nonexistent')
-        expect(() => ctx.listTables()).toThrow('Unknown base "Nonexistent"')
+        expect(() => ctx.runWithBase('Nonexistent', () => ctx.listTables())).toThrow('Unknown base "Nonexistent"')
     })
 
     it('proxies all ClientLike methods', async () => {
         const registry = createMockRegistry(['CRM'])
         const ctx = new ContextualClient(registry as any)
-        ctx.setBase('CRM')
 
         // Verify a representative set of methods all resolve without error
-        await expect(ctx.getMetadata()).resolves.toBeDefined()
-        await expect(ctx.listRows({ table: 'T' })).resolves.toBeDefined()
-        await expect(ctx.getRow('T', 'r1')).resolves.toBeDefined()
-        await expect(ctx.addRow('T', { Name: 'x' })).resolves.toBeDefined()
-        await expect(ctx.updateRow('T', 'r1', { Name: 'y' })).resolves.toBeDefined()
-        await expect(ctx.deleteRow('T', 'r1')).resolves.toBeDefined()
-        await expect(ctx.searchRows('T', { Name: 'x' })).resolves.toBeDefined()
-        await expect(ctx.querySql('SELECT 1')).resolves.toBeDefined()
-        await expect(ctx.listCollaborators()).resolves.toBeDefined()
-        await expect(ctx.createLinks({ table: 'T', linkColumn: 'L', pairs: [] })).resolves.toBeDefined()
-        await expect(ctx.deleteLinks({ table: 'T', linkColumn: 'L', pairs: [] })).resolves.toBeDefined()
-        await expect(ctx.addColumnOptions({ table: 'T', column: 'C', options: [] })).resolves.toBeDefined()
-        await expect(ctx.uploadFile({ table: 'T', column: 'C', rowId: 'r1', fileName: 'f.png', fileData: '' })).resolves.toBeDefined()
+        await ctx.runWithBase('CRM', async () => {
+            await expect(ctx.getMetadata()).resolves.toBeDefined()
+            await expect(ctx.listRows({ table: 'T' })).resolves.toBeDefined()
+            await expect(ctx.getRow('T', 'r1')).resolves.toBeDefined()
+            await expect(ctx.addRow('T', { Name: 'x' })).resolves.toBeDefined()
+            await expect(ctx.updateRow('T', 'r1', { Name: 'y' })).resolves.toBeDefined()
+            await expect(ctx.deleteRow('T', 'r1')).resolves.toBeDefined()
+            await expect(ctx.searchRows('T', { Name: 'x' })).resolves.toBeDefined()
+            await expect(ctx.querySql('SELECT 1')).resolves.toBeDefined()
+            await expect(ctx.listCollaborators()).resolves.toBeDefined()
+            await expect(ctx.createLinks({ table: 'T', linkColumn: 'L', pairs: [] })).resolves.toBeDefined()
+            await expect(ctx.deleteLinks({ table: 'T', linkColumn: 'L', pairs: [] })).resolves.toBeDefined()
+            await expect(ctx.addColumnOptions({ table: 'T', column: 'C', options: [] })).resolves.toBeDefined()
+            await expect(ctx.uploadFile({ table: 'T', column: 'C', rowId: 'r1', fileName: 'f.png', fileData: '' })).resolves.toBeDefined()
+        })
     })
 
-    it('setBase changes routing between calls', async () => {
+    it('runWithBase changes routing between calls', async () => {
         const registry = createMockRegistry(['CRM', 'Projects'])
         const ctx = new ContextualClient(registry as any)
 
-        ctx.setBase('CRM')
-        const row1 = await ctx.addRow('T', { x: 1 })
+        const row1 = await ctx.runWithBase('CRM', () => ctx.addRow('T', { x: 1 }))
         expect((row1 as any)._base).toBe('CRM')
 
-        ctx.setBase('Projects')
-        const row2 = await ctx.addRow('T', { x: 2 })
+        const row2 = await ctx.runWithBase('Projects', () => ctx.addRow('T', { x: 2 }))
+        expect((row2 as any)._base).toBe('Projects')
+    })
+
+    it('concurrent calls with different bases are isolated', async () => {
+        const registry = createMockRegistry(['CRM', 'Projects'])
+        const ctx = new ContextualClient(registry as any)
+
+        // Launch two concurrent calls with different bases
+        const [row1, row2] = await Promise.all([
+            ctx.runWithBase('CRM', () => ctx.addRow('T', { x: 1 })),
+            ctx.runWithBase('Projects', () => ctx.addRow('T', { x: 2 })),
+        ])
+        expect((row1 as any)._base).toBe('CRM')
         expect((row2 as any)._base).toBe('Projects')
     })
 })

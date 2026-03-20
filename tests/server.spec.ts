@@ -92,7 +92,7 @@ describe('SeaTableMCPServer', () => {
     it('handleListTools in multi-base mode injects base property with enum', async () => {
         const mockClient = new MockSeaTableClient() as unknown as ClientLike
         const multiBaseServer = new SeaTableMCPServer(mockClient, {
-            contextualClient: { setBase: () => {} } as any,
+            contextualClient: { runWithBase: (_n: any, fn: any) => fn() } as any,
             baseNames: ['CRM', 'Projects'],
         })
 
@@ -116,7 +116,7 @@ describe('SeaTableMCPServer', () => {
     it('handleListTools in multi-base mode does NOT inject base into list_bases', async () => {
         const mockClient = new MockSeaTableClient() as unknown as ClientLike
         const multiBaseServer = new SeaTableMCPServer(mockClient, {
-            contextualClient: { setBase: () => {} } as any,
+            contextualClient: { runWithBase: (_n: any, fn: any) => fn() } as any,
             baseNames: ['CRM', 'Projects'],
         })
 
