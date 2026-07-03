@@ -18,6 +18,24 @@ export interface OAuthProviderOptions {
     hostname?: string
     /** Optional callback to validate an API token before issuing an authorization code. */
     validateToken?: (token: string) => Promise<boolean>
+    /**
+     * Hosts (lowercased, without scheme/port) whose https redirect_uris are treated as
+     * trusted and shown without a warning. Loopback hosts are always trusted regardless.
+     * Unknown https hosts are still permitted, but the user is warned before submitting.
+     */
+    trustedRedirectHosts?: string[]
+}
+
+/** Result of classifying a redirect_uri for the authorization flow. */
+interface RedirectClassification {
+    /** Whether the redirect_uri is permitted at all. */
+    ok: boolean
+    /** Whether it is trusted (no warning shown). Only meaningful when ok is true. */
+    trusted: boolean
+    /** The redirect target host, for display. */
+    host: string
+    /** Human-readable rejection reason when ok is false. */
+    reason?: string
 }
 
 export class OAuthProvider {
@@ -25,14 +43,56 @@ export class OAuthProvider {
     private readonly cleanupInterval: ReturnType<typeof setInterval>
     private readonly configuredHostname?: string
     private readonly validateToken?: (token: string) => Promise<boolean>
+    private readonly trustedRedirectHosts: Set<string>
 
     constructor(options?: OAuthProviderOptions) {
         this.configuredHostname = options?.hostname
         this.validateToken = options?.validateToken
+        this.trustedRedirectHosts = new Set(
+            (options?.trustedRedirectHosts ?? []).map((h) => h.trim().toLowerCase()).filter(Boolean),
+        )
         this.cleanupInterval = setInterval(() => this.cleanup(), CLEANUP_INTERVAL_MS)
         if (this.cleanupInterval.unref) {
             this.cleanupInterval.unref()
         }
+    }
+
+    /**
+     * Classify a redirect_uri (Posture D):
+     *  - Loopback (localhost / 127.0.0.1 / ::1) over http|https → trusted (code lands on the
+     *    user's own machine, safe by construction).
+     *  - Configured trusted host over https → trusted.
+     *  - Any other https host → permitted but untrusted (user is warned before submitting).
+     *  - Remote http, unknown schemes, or malformed URIs → rejected.
+     */
+    private classifyRedirectUri(uri: string): RedirectClassification {
+        let parsed: URL
+        try {
+            parsed = new URL(uri)
+        } catch {
+            return { ok: false, trusted: false, host: '', reason: 'redirect_uri is not a valid URL.' }
+        }
+
+        const scheme = parsed.protocol.replace(/:$/, '').toLowerCase()
+        const host = parsed.hostname.toLowerCase()
+        const isLoopback = host === 'localhost' || host === '127.0.0.1' || host === '::1'
+
+        if (isLoopback) {
+            if (scheme === 'http' || scheme === 'https') {
+                return { ok: true, trusted: true, host }
+            }
+            return { ok: false, trusted: false, host, reason: 'Loopback redirect_uri must use http or https.' }
+        }
+
+        if (scheme !== 'https') {
+            return { ok: false, trusted: false, host, reason: 'A non-loopback redirect_uri must use https.' }
+        }
+
+        if (this.trustedRedirectHosts.has(host)) {
+            return { ok: true, trusted: true, host }
+        }
+
+        return { ok: true, trusted: false, host }
     }
 
     /**
@@ -60,7 +120,7 @@ export class OAuthProvider {
             response_types_supported: ['code'],
             grant_types_supported: ['authorization_code', 'refresh_token'],
             token_endpoint_auth_methods_supported: ['none'],
-            code_challenge_methods_supported: ['S256', 'plain'],
+            code_challenge_methods_supported: ['S256'],
         }
         res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(metadata))
     }
@@ -111,8 +171,17 @@ export class OAuthProvider {
         const codeChallengeMethod = url.searchParams.get('code_challenge_method') ?? ''
 
         if (req.method === 'GET') {
+            const classification = redirectUri
+                ? this.classifyRedirectUri(redirectUri)
+                : { ok: false, trusted: false, host: '', reason: 'Missing redirect_uri.' }
+            if (!classification.ok) {
+                logger.warn({ host: classification.host, reason: classification.reason }, 'OAuth authorize rejected: invalid redirect_uri')
+                res.writeHead(400, { 'content-type': 'text/html; charset=utf-8' })
+                res.end(this.renderErrorPage('Invalid redirect target', classification.reason ?? 'The redirect_uri is not allowed.'))
+                return
+            }
             res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' })
-            res.end(this.renderAuthorizePage(clientId, redirectUri, state, responseType, codeChallenge, codeChallengeMethod))
+            res.end(this.renderAuthorizePage(clientId, redirectUri, state, responseType, codeChallenge, codeChallengeMethod, classification))
             return
         }
 
@@ -124,9 +193,27 @@ export class OAuthProvider {
             const formCodeChallenge = body.get('code_challenge') ?? codeChallenge
             const formCodeChallengeMethod = body.get('code_challenge_method') ?? codeChallengeMethod
 
+            // Validate the redirect target first — never issue a token-bearing code to a
+            // disallowed destination, even if the request bypassed the GET form.
+            const classification = this.classifyRedirectUri(formRedirectUri)
+            if (!classification.ok) {
+                logger.warn({ host: classification.host, reason: classification.reason }, 'OAuth authorize rejected: invalid redirect_uri')
+                res.writeHead(400, { 'content-type': 'text/html; charset=utf-8' })
+                res.end(this.renderErrorPage('Invalid redirect target', classification.reason ?? 'The redirect_uri is not allowed.'))
+                return
+            }
+
+            // Enforce PKCE S256-only: reject 'plain' (and any implied default) when a challenge is present.
+            if (formCodeChallenge && formCodeChallengeMethod !== 'S256') {
+                logger.warn({ method: formCodeChallengeMethod || '(default)' }, 'OAuth authorize rejected: unsupported PKCE method')
+                res.writeHead(400, { 'content-type': 'text/html; charset=utf-8' })
+                res.end(this.renderErrorPage('Unsupported PKCE method', 'Only the S256 code_challenge_method is supported.'))
+                return
+            }
+
             if (!apiToken) {
                 res.writeHead(400, { 'content-type': 'text/html; charset=utf-8' })
-                res.end(this.renderAuthorizePage(clientId, formRedirectUri, formState, responseType, formCodeChallenge, formCodeChallengeMethod, 'Please enter your API token.'))
+                res.end(this.renderAuthorizePage(clientId, formRedirectUri, formState, responseType, formCodeChallenge, formCodeChallengeMethod, classification, 'Please enter your API token.'))
                 return
             }
 
@@ -136,14 +223,9 @@ export class OAuthProvider {
                 if (!valid) {
                     logger.warn('OAuth authorization rejected: invalid API token')
                     res.writeHead(400, { 'content-type': 'text/html; charset=utf-8' })
-                    res.end(this.renderAuthorizePage(clientId, formRedirectUri, formState, responseType, formCodeChallenge, formCodeChallengeMethod, 'Invalid API token. Please check your token and try again.'))
+                    res.end(this.renderAuthorizePage(clientId, formRedirectUri, formState, responseType, formCodeChallenge, formCodeChallengeMethod, classification, 'Invalid API token. Please check your token and try again.'))
                     return
                 }
-            }
-
-            if (!formRedirectUri) {
-                res.writeHead(400, { 'content-type': 'text/plain' }).end('Missing redirect_uri')
-                return
             }
 
             const code = randomBytes(32).toString('hex')
@@ -247,9 +329,7 @@ export class OAuthProvider {
                 return
             }
 
-            const expected = stored.codeChallengeMethod === 'plain'
-                ? codeVerifier
-                : base64UrlEncode(createHash('sha256').update(codeVerifier).digest())
+            const expected = base64UrlEncode(createHash('sha256').update(codeVerifier).digest())
 
             if (expected !== stored.codeChallenge) {
                 logger.warn('OAuth PKCE verification failed')
@@ -332,8 +412,15 @@ export class OAuthProvider {
         })
     }
 
-    private renderAuthorizePage(clientId: string, redirectUri: string, state: string, responseType: string, codeChallenge: string, codeChallengeMethod: string, error?: string): string {
+    private renderAuthorizePage(clientId: string, redirectUri: string, state: string, responseType: string, codeChallenge: string, codeChallengeMethod: string, classification: RedirectClassification, error?: string): string {
         const errorHtml = error ? `<div class="error">${this.escapeHtml(error)}</div>` : ''
+
+        const host = this.escapeHtml(classification.host)
+        const destinationHtml = classification.trusted
+            ? `<div class="destination">Access will be sent to <strong>${host}</strong>.</div>`
+            : `<div class="warning"><strong>⚠️ Unrecognized destination: ${host}</strong><br>
+                Your API token will be sent here. We don't recognize this service — only continue if
+                <em>you</em> started this connection from a tool you trust. If you didn't, close this page.</div>`
 
         return `<!DOCTYPE html>
 <html lang="en">
@@ -385,6 +472,8 @@ export class OAuthProvider {
         }
         button:hover { background: #e07b00; }
         .error { background: #fee; color: #c00; padding: 10px 12px; border-radius: 6px; margin-bottom: 16px; font-size: 0.9em; }
+        .destination { background: #f0f7ff; color: #345; padding: 10px 12px; border-radius: 6px; margin-bottom: 16px; font-size: 0.85em; }
+        .warning { background: #fff4e5; color: #8a4b00; border: 1px solid #ffcc80; padding: 12px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 0.85em; line-height: 1.5; }
         .hint { margin-top: 16px; font-size: 0.8em; color: #999; line-height: 1.4; }
     </style>
 </head>
@@ -392,6 +481,7 @@ export class OAuthProvider {
     <div class="card">
         <h1>SeaTable MCP</h1>
         <p class="subtitle">Enter your SeaTable API token to authorize access to your base.</p>
+        ${destinationHtml}
         ${errorHtml}
         <form method="POST" action="/authorize">
             <input type="hidden" name="redirect_uri" value="${this.escapeHtml(redirectUri)}">
@@ -405,6 +495,29 @@ export class OAuthProvider {
             <button type="submit">Authorize</button>
             <p class="hint">Your API token will be used as your access credential. Use a read-only token for minimal permissions.</p>
         </form>
+    </div>
+</body>
+</html>`
+    }
+
+    private renderErrorPage(title: string, message: string): string {
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SeaTable MCP — ${this.escapeHtml(title)}</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+        .card { background: white; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); padding: 40px; max-width: 440px; width: 100%; }
+        h1 { font-size: 1.4em; margin-bottom: 12px; color: #c00; }
+        p { color: #555; line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>${this.escapeHtml(title)}</h1>
+        <p>${this.escapeHtml(message)}</p>
     </div>
 </body>
 </html>`

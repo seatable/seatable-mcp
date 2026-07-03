@@ -73,7 +73,7 @@ describe('OAuthProvider', () => {
             const res = await fetch(base('/register'), {
                 method: 'POST',
                 headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ client_name: 'test-client', redirect_uris: ['http://example.com/cb'] }),
+                body: JSON.stringify({ client_name: 'test-client', redirect_uris: ['https://example.com/cb'] }),
             })
             expect(res.status).toBe(201)
             const data = await res.json()
@@ -84,7 +84,7 @@ describe('OAuthProvider', () => {
 
     describe('authorize', () => {
         it('GET /authorize renders HTML form', async () => {
-            const res = await fetch(base('/authorize?client_id=test&redirect_uri=http://example.com/cb&state=abc123'))
+            const res = await fetch(base('/authorize?client_id=test&redirect_uri=https://example.com/cb&state=abc123'))
             expect(res.status).toBe(200)
             expect(res.headers.get('content-type')).toContain('text/html')
             const html = await res.text()
@@ -94,7 +94,7 @@ describe('OAuthProvider', () => {
         })
 
         it('POST /authorize without token returns error', async () => {
-            const res = await fetch(base('/authorize?redirect_uri=http://example.com/cb&state=xyz'), {
+            const res = await fetch(base('/authorize?redirect_uri=https://example.com/cb&state=xyz'), {
                 method: 'POST',
                 headers: { 'content-type': 'application/x-www-form-urlencoded' },
                 body: 'api_token=',
@@ -109,12 +109,12 @@ describe('OAuthProvider', () => {
             const res = await fetch(base('/authorize'), {
                 method: 'POST',
                 headers: { 'content-type': 'application/x-www-form-urlencoded' },
-                body: 'api_token=my-secret-token&redirect_uri=http://example.com/cb&state=xyz',
+                body: 'api_token=my-secret-token&redirect_uri=https://example.com/cb&state=xyz',
                 redirect: 'manual',
             })
             expect(res.status).toBe(302)
             const location = res.headers.get('location')!
-            expect(location).toContain('http://example.com/cb')
+            expect(location).toContain('https://example.com/cb')
             expect(location).toContain('code=')
             expect(location).toContain('state=xyz')
         })
@@ -125,7 +125,7 @@ describe('OAuthProvider', () => {
             const authorizeRes = await fetch(base('/authorize'), {
                 method: 'POST',
                 headers: { 'content-type': 'application/x-www-form-urlencoded' },
-                body: 'api_token=test-api-token-123&redirect_uri=http://example.com/cb&state=s1',
+                body: 'api_token=test-api-token-123&redirect_uri=https://example.com/cb&state=s1',
                 redirect: 'manual',
             })
             const location = new URL(authorizeRes.headers.get('location')!)
@@ -135,7 +135,7 @@ describe('OAuthProvider', () => {
             const tokenRes = await fetch(base('/token'), {
                 method: 'POST',
                 headers: { 'content-type': 'application/x-www-form-urlencoded' },
-                body: `grant_type=authorization_code&code=${code}&redirect_uri=http://example.com/cb`,
+                body: `grant_type=authorization_code&code=${code}&redirect_uri=https://example.com/cb`,
             })
             expect(tokenRes.status).toBe(200)
             const tokenData = await tokenRes.json()
@@ -148,7 +148,7 @@ describe('OAuthProvider', () => {
             const authorizeRes = await fetch(base('/authorize'), {
                 method: 'POST',
                 headers: { 'content-type': 'application/x-www-form-urlencoded' },
-                body: 'api_token=single-use-token&redirect_uri=http://example.com/cb',
+                body: 'api_token=single-use-token&redirect_uri=https://example.com/cb',
                 redirect: 'manual',
             })
             const location = new URL(authorizeRes.headers.get('location')!)
@@ -209,7 +209,7 @@ describe('OAuthProvider', () => {
             const authorizeRes = await fetch(base('/authorize'), {
                 method: 'POST',
                 headers: { 'content-type': 'application/x-www-form-urlencoded' },
-                body: 'api_token=mismatch-token&redirect_uri=http://example.com/cb',
+                body: 'api_token=mismatch-token&redirect_uri=https://example.com/cb',
                 redirect: 'manual',
             })
             const location = new URL(authorizeRes.headers.get('location')!)
@@ -218,7 +218,7 @@ describe('OAuthProvider', () => {
             const res = await fetch(base('/token'), {
                 method: 'POST',
                 headers: { 'content-type': 'application/x-www-form-urlencoded' },
-                body: `grant_type=authorization_code&code=${code}&redirect_uri=http://other.com/cb`,
+                body: `grant_type=authorization_code&code=${code}&redirect_uri=https://other.com/cb`,
             })
             expect(res.status).toBe(400)
             const data = await res.json()
@@ -237,7 +237,7 @@ describe('OAuthProvider', () => {
             const authorizeRes = await fetch(base('/authorize'), {
                 method: 'POST',
                 headers: { 'content-type': 'application/x-www-form-urlencoded' },
-                body: `api_token=pkce-token&redirect_uri=http://example.com/cb&code_challenge=${codeChallenge}&code_challenge_method=S256`,
+                body: `api_token=pkce-token&redirect_uri=https://example.com/cb&code_challenge=${codeChallenge}&code_challenge_method=S256`,
                 redirect: 'manual',
             })
             const location = new URL(authorizeRes.headers.get('location')!)
@@ -261,7 +261,7 @@ describe('OAuthProvider', () => {
             const authorizeRes = await fetch(base('/authorize'), {
                 method: 'POST',
                 headers: { 'content-type': 'application/x-www-form-urlencoded' },
-                body: `api_token=pkce-token&redirect_uri=http://example.com/cb&code_challenge=${codeChallenge}&code_challenge_method=S256`,
+                body: `api_token=pkce-token&redirect_uri=https://example.com/cb&code_challenge=${codeChallenge}&code_challenge_method=S256`,
                 redirect: 'manual',
             })
             const location = new URL(authorizeRes.headers.get('location')!)
@@ -286,7 +286,7 @@ describe('OAuthProvider', () => {
             const authorizeRes = await fetch(base('/authorize'), {
                 method: 'POST',
                 headers: { 'content-type': 'application/x-www-form-urlencoded' },
-                body: `api_token=pkce-token&redirect_uri=http://example.com/cb&code_challenge=${codeChallenge}&code_challenge_method=S256`,
+                body: `api_token=pkce-token&redirect_uri=https://example.com/cb&code_challenge=${codeChallenge}&code_challenge_method=S256`,
                 redirect: 'manual',
             })
             const location = new URL(authorizeRes.headers.get('location')!)
@@ -301,6 +301,95 @@ describe('OAuthProvider', () => {
             const data = await tokenRes.json()
             expect(data.error).toBe('invalid_request')
             expect(data.error_description).toContain('code_verifier')
+        })
+
+        it('rejects plain PKCE at /authorize', async () => {
+            const res = await fetch(base('/authorize'), {
+                method: 'POST',
+                headers: { 'content-type': 'application/x-www-form-urlencoded' },
+                body: 'api_token=t&redirect_uri=https://example.com/cb&code_challenge=abc&code_challenge_method=plain',
+                redirect: 'manual',
+            })
+            expect(res.status).toBe(400)
+            const html = await res.text()
+            expect(html).toContain('S256')
+        })
+    })
+
+    describe('redirect_uri validation (Posture D)', () => {
+        it('rejects a remote http redirect_uri', async () => {
+            const res = await fetch(base('/authorize?redirect_uri=http://evil.example/cb'))
+            expect(res.status).toBe(400)
+            const html = await res.text()
+            expect(html).toContain('https')
+        })
+
+        it('rejects a non-http(s) scheme', async () => {
+            const res = await fetch(base('/authorize?redirect_uri=' + encodeURIComponent('javascript:alert(1)')))
+            expect(res.status).toBe(400)
+        })
+
+        it('rejects a malformed redirect_uri', async () => {
+            const res = await fetch(base('/authorize?redirect_uri=not-a-url'))
+            expect(res.status).toBe(400)
+        })
+
+        it('allows loopback without a warning', async () => {
+            const res = await fetch(base('/authorize?redirect_uri=' + encodeURIComponent('http://localhost:8080/cb')))
+            expect(res.status).toBe(200)
+            const html = await res.text()
+            expect(html).toContain('localhost')
+            expect(html).not.toContain('Unrecognized destination')
+        })
+
+        it('allows an unknown https host but shows a warning', async () => {
+            const res = await fetch(base('/authorize?redirect_uri=' + encodeURIComponent('https://unknown.example/cb')))
+            expect(res.status).toBe(200)
+            const html = await res.text()
+            expect(html).toContain('Unrecognized destination')
+            expect(html).toContain('unknown.example')
+        })
+
+        it('rejects a remote http redirect_uri on POST too', async () => {
+            const res = await fetch(base('/authorize'), {
+                method: 'POST',
+                headers: { 'content-type': 'application/x-www-form-urlencoded' },
+                body: 'api_token=t&redirect_uri=http://evil.example/cb',
+                redirect: 'manual',
+            })
+            expect(res.status).toBe(400)
+        })
+    })
+
+    describe('trusted redirect hosts', () => {
+        let trustedServer: Server
+        let trustedPort: number
+        let trustedProvider: OAuthProvider
+
+        beforeAll(async () => {
+            trustedProvider = new OAuthProvider({ trustedRedirectHosts: ['trusted.example'] })
+            trustedServer = createServer(async (req, res) => {
+                const url = new URL(req.url!, 'http://localhost')
+                if (url.pathname === '/authorize') await trustedProvider.handleAuthorize(req, res, url)
+                else res.writeHead(404).end()
+            })
+            await new Promise<void>((resolve) => trustedServer.listen(0, () => {
+                trustedPort = (trustedServer.address() as any).port
+                resolve()
+            }))
+        })
+
+        afterAll(() => {
+            trustedProvider.destroy()
+            trustedServer.close()
+        })
+
+        it('shows a configured https host without a warning', async () => {
+            const res = await fetch(`http://localhost:${trustedPort}/authorize?redirect_uri=${encodeURIComponent('https://trusted.example/cb')}`)
+            expect(res.status).toBe(200)
+            const html = await res.text()
+            expect(html).toContain('trusted.example')
+            expect(html).not.toContain('Unrecognized destination')
         })
     })
 })

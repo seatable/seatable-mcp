@@ -35,6 +35,8 @@ Auth (one required in selfhosted): `SEATABLE_API_TOKEN` (single-base) or `SEATAB
 
 Optional: `SEATABLE_MODE` (`selfhosted`|`managed`, default `selfhosted`), `SEATABLE_MOCK=true` (offline mock), `SEATABLE_ENABLE_DEBUG_TOOLS=1` (enables `echo_args` tool)
 
+Managed-mode OAuth: `SEATABLE_OAUTH_TRUSTED_REDIRECT_HOSTS` (comma-separated https hosts shown without a warning on the authorize page; loopback is always trusted, unknown https hosts are allowed but warned, remote http is rejected)
+
 Copy `.env.example` to `.env` for local development.
 
 ## Architecture

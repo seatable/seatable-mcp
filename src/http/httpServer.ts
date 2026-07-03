@@ -66,6 +66,12 @@ function parseCorsOrigins(): string[] {
     return raw.split(',').map(o => o.trim()).filter(Boolean)
 }
 
+function parseTrustedRedirectHosts(): string[] {
+    const raw = process.env.SEATABLE_OAUTH_TRUSTED_REDIRECT_HOSTS
+    if (!raw) return []
+    return raw.split(',').map(h => h.trim().toLowerCase()).filter(Boolean)
+}
+
 function setCorsHeaders(req: IncomingMessage, res: ServerResponse, allowedOrigins: string[]): void {
     const origin = req.headers.origin
     if (!origin || !allowedOrigins.includes(origin)) return
@@ -90,6 +96,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
     const oauthProvider = mode === 'managed' ? new OAuthProvider({
         hostname: process.env.SEATABLE_MCP_HOSTNAME,
         validateToken: tokenValidator ? (token) => tokenValidator.validate(token) : undefined,
+        trustedRedirectHosts: parseTrustedRedirectHosts(),
     }) : undefined
 
     const toolDefinitions = getStaticToolDefinitions()
