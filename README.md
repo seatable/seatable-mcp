@@ -128,12 +128,33 @@ For hosting an MCP endpoint where each client authenticates with their own SeaTa
 ```bash
 SEATABLE_MODE=managed \
 SEATABLE_SERVER_URL=https://your-seatable-server.com \
+SEATABLE_TOKEN_SECRET=$(openssl rand -hex 32) \
 PORT=3000 npx -y @seatable/mcp-seatable --sse
 ```
 
-Clients pass their API token via `Authorization: Bearer <token>` on session initialization. The server validates the token against SeaTable and applies rate limits (60 req/min per token, 120/min per IP, 20 concurrent connections per token).
+`SEATABLE_TOKEN_SECRET` is **required** in managed mode. It seals the OAuth tokens the server issues, so the underlying SeaTable API token never has to be handed to a client. Keep it stable across restarts — changing it invalidates every issued access and refresh token and forces all clients to re-authorize.
 
-**OAuth support:** Managed mode also exposes OAuth 2.0 endpoints (`/authorize` and `/token`), enabling OAuth-compatible clients like ChatGPT to connect. During the OAuth flow, the user enters their SeaTable API token, which is then used as the access token — no external OAuth provider required.
+Clients pass their credential via `Authorization: Bearer <token>` — on session initialization **and on every subsequent request**, including `GET` and `DELETE`. The `mcp-session-id` header is a routing value only; it is never accepted on its own. Each request is re-validated and must resolve to the same identity that created the session, otherwise the server answers `401` (missing/invalid credential) or `403` (valid credential, wrong session). Rate limits apply as before (60 req/min per token, 120/min per IP, 20 concurrent connections per token).
+
+**OAuth support:** Managed mode also exposes OAuth 2.0 endpoints (`/authorize` and `/token`), enabling OAuth-compatible clients like ChatGPT to connect — no external OAuth provider required. During the flow the user enters their SeaTable API token; the server seals it into its own short-lived access token (1 h) and a rotating refresh token (14 d). The raw SeaTable API token is never returned to a client.
+
+Clients must register at `/register` first: the returned `client_id` carries the client's name and its `redirect_uris`, and the server accepts a callback only if it is one the client registered (loopback callbacks may vary the port, per RFC 8252). PKCE with `S256` is mandatory, and every authorization code is bound to the client, the exact callback and the challenge.
+
+**Where a code may be delivered.** With open dynamic registration, "registered client" is not a trust statement — anyone can register. What matters is whether the code leaves the user's machine:
+
+| Callback | Behaviour |
+|---|---|
+| Loopback (`http://127.0.0.1:…`, `localhost`, `[::1]`) | allowed, no extra step — the code stays on the user's machine |
+| Private-use scheme (`cursor://`, `vscode://`, `com.example.app:/…`) | allowed, no extra step — handed to a local application |
+| `https` on a host in `SEATABLE_OAUTH_TRUSTED_REDIRECT_HOSTS` | allowed, no extra step |
+| `https` on any other host | allowed **after** the user confirms the destination on a separate page |
+| Remote plaintext `http`, `javascript:`, `data:`, `file:`, `blob:` | rejected |
+
+The confirmation cannot be skipped from the entry link: it is read from the form body only, and a POST auto-submitted by a foreign page is refused via `Sec-Fetch-Site`. The trusted-host list therefore removes friction — it is not a gate, and leaving it unset breaks nothing.
+
+The consent screen leads with the destination the authorization will be sent to. The application's name is shown as **self-reported**, because with open registration it is chosen by whoever registered the client and cannot be verified.
+
+The OAuth endpoints are rate limited per IP (30/min overall, 10/min for token submissions), so `/authorize` cannot be used as an unthrottled oracle for testing SeaTable API tokens.
 
 OAuth endpoints follow the MCP specification (RFC 8414 metadata discovery, PKCE, dynamic client registration):
 
@@ -207,6 +228,7 @@ Authentication (one of these is required in selfhosted mode):
 Optional:
 
 - `SEATABLE_MODE` — `selfhosted` (default) or `managed` (multi-tenant HTTP with per-client auth)
+- `SEATABLE_TOKEN_SECRET` — **required in managed mode**, min. 32 chars. Seals issued OAuth tokens and client registrations; must be stable across restarts (`openssl rand -hex 32`)
 - `SEATABLE_MOCK=true` — Enable mock mode for offline testing
 - `CORS_ALLOWED_ORIGINS` — Comma-separated list of allowed origins for CORS (HTTP mode only, disabled if unset)
 - `METRICS_PORT` — Prometheus metrics port (default: `9090`, HTTP mode only)

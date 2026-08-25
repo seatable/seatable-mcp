@@ -33,6 +33,8 @@ Required: `SEATABLE_SERVER_URL`
 
 Auth (one required in selfhosted): `SEATABLE_API_TOKEN` (single-base) or `SEATABLE_BASES` (multi-base, JSON array `'[{"base_name":"CRM","api_token":"..."}]'`)
 
+Required in managed mode: `SEATABLE_TOKEN_SECRET` (min. 32 chars, stable across restarts) — seals issued OAuth tokens and client registrations.
+
 Optional: `SEATABLE_MODE` (`selfhosted`|`managed`, default `selfhosted`), `SEATABLE_MOCK=true` (offline mock), `SEATABLE_ENABLE_DEBUG_TOOLS=1` (enables `echo_args` tool)
 
 Copy `.env.example` to `.env` for local development.
@@ -46,7 +48,15 @@ Copy `.env.example` to `.env` for local development.
 ### Modes
 
 - **Selfhosted** (default): Single API token from env, one client per process. Supports multi-base via `SEATABLE_BASES`.
-- **Managed** (`SEATABLE_MODE=managed`): HTTP-only, each client authenticates with their own Bearer token. Token validated against SeaTable (`src/auth/tokenValidator.ts`) with positive (5 min) / negative (1 min) cache. Rate limiting via `src/ratelimit/` (per-token, per-IP, global, concurrent connections).
+- **Managed** (`SEATABLE_MODE=managed`): HTTP-only, each client authenticates with their own Bearer token **on every request** — the `mcp-session-id` header is a routing value, never a credential, and a request must resolve to the identity that created the session. Token validated against SeaTable (`src/auth/tokenValidator.ts`) with positive (1 min) / negative (1 min) cache. Rate limiting via `src/ratelimit/` (per-token, per-IP, global, concurrent connections).
+
+### OAuth (managed mode)
+
+`src/auth/oauthProvider.ts` bridges SeaTable API tokens into an OAuth 2.0 authorization code flow. Client registrations and issued tokens are **stateless sealed envelopes** (`src/auth/tokenCipher.ts`, AES-256-GCM keyed from `SEATABLE_TOKEN_SECRET`), so no server-side store is needed and they survive restarts. The `client_id` carries the client's registered `redirect_uris`; `/authorize` rejects anything it cannot open. PKCE `S256` is mandatory and every code is bound to client + exact callback + challenge. The raw SeaTable API token is never returned — `resolveAccessToken()` unseals it server-side.
+
+Callback policy is in `isPermittedRedirectUri()` (may it be used at all) and `isTrustedRedirectUri()` (may it skip the confirmation step). Unknown remote https destinations are allowed but meet an acknowledgement page; the acknowledgement is read from the form body only and requires `Sec-Fetch-Site: same-origin`, so neither the entry link nor a foreign auto-submit can skip it. `SEATABLE_OAUTH_TRUSTED_REDIRECT_HOSTS` only removes that friction.
+
+Adversarial coverage lives in `tests/oauthProvider.security.spec.ts`, `tests/oauthRedirectPolicy.spec.ts`, `tests/oauthRateLimit.spec.ts` and `tests/managedSessionAuth.spec.ts`; they encode attacker behaviour, not honest-client mistakes. `tests/oauthObservability.spec.ts` pins the audit fields (`flow`, `ip`, `callback`, `clientName`) that the July–August 2026 log analysis found missing.
 
 ### Tool Registration Pattern
 
