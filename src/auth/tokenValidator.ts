@@ -8,7 +8,9 @@ interface CacheEntry {
     expiresAt: number
 }
 
-const POSITIVE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+// Kept deliberately short: this is the window in which a revoked SeaTable token
+// still passes validation, for established sessions as well as new ones.
+const POSITIVE_TTL_MS = 60 * 1000 // 1 minute
 const NEGATIVE_TTL_MS = 1 * 60 * 1000 // 1 minute
 
 export class TokenValidator {
@@ -48,6 +50,24 @@ export class TokenValidator {
             logger.warn({ status }, 'Token validation failed')
             this.cache.set(apiToken, { valid: false, expiresAt: Date.now() + NEGATIVE_TTL_MS })
             authValidationsTotal.inc({ result: 'failure' })
+            return false
+        }
+    }
+
+    /**
+     * Does this token authenticate as a SeaTable *account* token?
+     *
+     * Only asked after validate() failed, so the extra request is bounded by the
+     * failure rate. Used to tell the user they pasted the wrong kind of token.
+     */
+    async looksLikeAccountToken(apiToken: string): Promise<boolean> {
+        try {
+            const res = await axios.get(`${this.serverUrl}/api2/account/info/`, {
+                headers: { Authorization: `Token ${apiToken}` },
+                timeout: 10_000,
+            })
+            return res.status === 200
+        } catch {
             return false
         }
     }

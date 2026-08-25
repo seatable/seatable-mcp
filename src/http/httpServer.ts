@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
@@ -24,8 +24,19 @@ export interface StartHttpServerOptions {
 type ActiveSession = {
     transport: StreamableHTTPServerTransport
     apiToken?: string
+    /** Digest of the SeaTable API token that created this session; every later request must resolve to the same one. */
+    apiTokenDigest?: Buffer
     lastActivity: number
     close: () => Promise<void>
+}
+
+function digest(value: string): Buffer {
+    return createHash('sha256').update(value).digest()
+}
+
+/** Session IDs are credentials-adjacent routing values — log a fingerprint, never the value. */
+function sessionFingerprint(sessionId: string): string {
+    return createHash('sha256').update(sessionId).digest('hex').slice(0, 12)
 }
 
 const MAX_BODY_SIZE = 10 * 1024 * 1024 // 10 MB
@@ -60,6 +71,16 @@ async function parseJsonBody(req: IncomingMessage): Promise<unknown> {
     })
 }
 
+/**
+ * Hosts allowed as remote https callbacks in the OAuth flow. Unset means the
+ * built-in list of hosted MCP clients; '*' disables curation (dangerous).
+ */
+function parseTrustedRedirectHosts(): string[] | undefined {
+    const raw = process.env.SEATABLE_OAUTH_TRUSTED_REDIRECT_HOSTS
+    if (raw === undefined) return undefined
+    return raw.split(',').map((h) => h.trim().toLowerCase()).filter(Boolean)
+}
+
 function parseCorsOrigins(): string[] {
     const raw = process.env.CORS_ALLOWED_ORIGINS
     if (!raw) return []
@@ -89,7 +110,11 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
 
     const oauthProvider = mode === 'managed' ? new OAuthProvider({
         hostname: process.env.SEATABLE_MCP_HOSTNAME,
+        secret: env.SEATABLE_TOKEN_SECRET,
+        trustedRedirectHosts: parseTrustedRedirectHosts(),
         validateToken: tokenValidator ? (token) => tokenValidator.validate(token) : undefined,
+        looksLikeAccountToken: tokenValidator ? (token) => tokenValidator.looksLikeAccountToken(token) : undefined,
+        getClientIp: (req) => getClientIp(req),
     }) : undefined
 
     const toolDefinitions = getStaticToolDefinitions()
@@ -101,6 +126,20 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
         return auth.startsWith('Bearer ') ? auth.slice(7) : auth
     }
 
+    /**
+     * Turns a presented Bearer credential into the SeaTable API token behind it.
+     *
+     * Accepts both an OAuth access token we issued (sealed, resolved locally) and a
+     * raw SeaTable API token (for clients that configure one directly). Either way
+     * the underlying token is validated against SeaTable, so a revoked token stops
+     * working within the validator's cache window.
+     */
+    async function resolveApiToken(bearer: string): Promise<string | undefined> {
+        const candidate = oauthProvider?.resolveAccessToken(bearer) ?? bearer
+        if (!(await tokenValidator!.validate(candidate))) return undefined
+        return candidate
+    }
+
     const trustProxy = env.TRUST_PROXY ?? true
 
     function getClientIp(req: IncomingMessage): string {
@@ -109,6 +148,29 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
             if (typeof forwarded === 'string') return forwarded.split(',')[0].trim()
         }
         return req.socket.remoteAddress ?? 'unknown'
+    }
+
+    /**
+     * Throttle an OAuth endpoint by client IP. Returns true when the request was
+     * rejected and a response has already been sent.
+     */
+    function oauthThrottled(req: IncomingMessage, res: ServerResponse, isTokenSubmission = false): boolean {
+        if (!rateLimiter) return false
+        const ip = getClientIp(req)
+        const checks = isTokenSubmission
+            ? [rateLimiter.tokenSubmission.check(ip), rateLimiter.oauth.check(ip)]
+            : [rateLimiter.oauth.check(ip)]
+        for (const result of checks) {
+            if (!result.allowed) {
+                logger.warn({ ip, endpoint: req.url }, 'OAuth rate limit exceeded')
+                res.writeHead(429, {
+                    'content-type': 'text/plain',
+                    'retry-after': String(Math.max(1, Math.ceil(result.retryAfterMs / 1000))),
+                }).end('Too many requests')
+                return true
+            }
+        }
+        return false
     }
 
     async function handleMcpRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -154,14 +216,14 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
             // In managed mode: require and validate Bearer token
             let apiToken: string | undefined
             if (mode === 'managed') {
-                apiToken = extractBearerToken(req)
-                if (!apiToken) {
+                const bearer = extractBearerToken(req)
+                if (!bearer) {
                     logger.warn({ ip: getClientIp(req) }, 'Missing Authorization header')
                     res.writeHead(401, { 'content-type': 'text/plain' }).end('Missing Authorization header')
                     return
                 }
-                const valid = await tokenValidator!.validate(apiToken)
-                if (!valid) {
+                apiToken = await resolveApiToken(bearer)
+                if (!apiToken) {
                     logger.warn({ ip: getClientIp(req) }, 'Invalid API token')
                     res.writeHead(401, { 'content-type': 'text/plain' }).end('Invalid API token')
                     return
@@ -183,8 +245,14 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
                 sessionIdGenerator: () => randomUUID(),
                 onsessioninitialized: (id) => {
                     mcpServer.setSessionId(id)
-                    logger.info({ sessionId: id }, 'Session initialized')
-                    sessions.set(id, { transport, apiToken, lastActivity: Date.now(), close: cleanup })
+                    logger.info({ session: sessionFingerprint(id) }, 'Session initialized')
+                    sessions.set(id, {
+                        transport,
+                        apiToken,
+                        apiTokenDigest: apiToken ? digest(apiToken) : undefined,
+                        lastActivity: Date.now(),
+                        close: cleanup,
+                    })
                     activeSessions.inc()
                 },
             })
@@ -222,14 +290,42 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
             return
         }
 
-        // For requests with an existing session ID: look up the session
+        // For requests with an existing session ID: authenticate first, then look up the session.
+        // The session ID is a routing value, never an authorization credential.
         if (sessionId) {
+            let presentedDigest: Buffer | undefined
+            if (mode === 'managed') {
+                const bearer = extractBearerToken(req)
+                if (!bearer) {
+                    logger.warn({ ip: getClientIp(req), session: sessionFingerprint(sessionId) }, 'Session request without Authorization header')
+                    res.writeHead(401, { 'content-type': 'text/plain' }).end('Missing Authorization header')
+                    return
+                }
+                const apiToken = await resolveApiToken(bearer)
+                if (!apiToken) {
+                    logger.warn({ ip: getClientIp(req), session: sessionFingerprint(sessionId) }, 'Session request with invalid credential')
+                    res.writeHead(401, { 'content-type': 'text/plain' }).end('Invalid API token')
+                    return
+                }
+                presentedDigest = digest(apiToken)
+            }
+
             const session = sessions.get(sessionId)
             if (!session) {
-                logger.debug({ sessionId }, 'Session not found')
+                logger.debug({ session: sessionFingerprint(sessionId) }, 'Session not found')
                 res.writeHead(404, { 'content-type': 'text/plain' }).end('Session expired. Please reconnect to start a new session.')
                 return
             }
+
+            if (presentedDigest) {
+                const owner = session.apiTokenDigest
+                if (!owner || owner.length !== presentedDigest.length || !timingSafeEqual(owner, presentedDigest)) {
+                    logger.warn({ ip: getClientIp(req), session: sessionFingerprint(sessionId) }, 'Session request from a different identity')
+                    res.writeHead(403, { 'content-type': 'text/plain' }).end('Credential does not match this session')
+                    return
+                }
+            }
+
             session.lastActivity = Date.now()
             await session.transport.handleRequest(req, res, body)
             return
@@ -311,6 +407,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
         }
 
         if (oauthProvider && (url.pathname === '/authorize' || url.pathname === '/oauth/authorize') && (req.method === 'GET' || req.method === 'POST')) {
+            if (oauthThrottled(req, res, req.method === 'POST')) return
             try {
                 await oauthProvider.handleAuthorize(req, res, url)
             } catch (error) {
@@ -323,6 +420,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
         }
 
         if (oauthProvider && (url.pathname === '/token' || url.pathname === '/oauth/token') && req.method === 'POST') {
+            if (oauthThrottled(req, res)) return
             try {
                 await oauthProvider.handleToken(req, res)
             } catch (error) {
@@ -335,6 +433,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
         }
 
         if (oauthProvider && url.pathname === '/register' && req.method === 'POST') {
+            if (oauthThrottled(req, res)) return
             try {
                 await oauthProvider.handleRegister(req, res)
             } catch (error) {
@@ -364,7 +463,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
         const now = Date.now()
         for (const [sessionId, session] of sessions.entries()) {
             if (now - session.lastActivity > sessionIdleTimeoutMs) {
-                logger.info({ sessionId }, 'Closing idle session')
+                logger.info({ session: sessionFingerprint(sessionId) }, 'Closing idle session')
                 void session.close()
             }
         }
@@ -380,7 +479,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
         oauthProvider?.destroy()
         const sessionCount = sessions.size
         for (const [sessionId, session] of sessions.entries()) {
-            logger.debug({ sessionId }, 'Closing session during shutdown')
+            logger.debug({ session: sessionFingerprint(sessionId) }, 'Closing session during shutdown')
             await session.close()
         }
         await new Promise<void>((resolve) => server.close(() => resolve()))
