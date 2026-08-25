@@ -112,6 +112,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
         hostname: process.env.SEATABLE_MCP_HOSTNAME,
         secret: env.SEATABLE_TOKEN_SECRET,
         trustedRedirectHosts: parseTrustedRedirectHosts(),
+        accessTokenTtlMs: env.SEATABLE_ACCESS_TOKEN_TTL ? env.SEATABLE_ACCESS_TOKEN_TTL * 1000 : undefined,
         validateToken: tokenValidator ? (token) => tokenValidator.validate(token) : undefined,
         looksLikeAccountToken: tokenValidator ? (token) => tokenValidator.looksLikeAccountToken(token) : undefined,
         getClientIp: (req) => getClientIp(req),

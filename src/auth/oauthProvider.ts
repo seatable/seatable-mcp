@@ -32,8 +32,8 @@ interface ClientRegistration extends Record<string, unknown> {
 }
 
 const CODE_TTL_MS = 5 * 60 * 1000 // 5 minutes
-const ACCESS_TOKEN_TTL_MS = 60 * 60 * 1000 // 1 hour
-const REFRESH_TOKEN_TTL_MS = 14 * 24 * 60 * 60 * 1000 // 14 days
+const DEFAULT_ACCESS_TOKEN_TTL_MS = 60 * 60 * 1000 // 1 hour
+const MIN_REFRESH_TOKEN_TTL_MS = 14 * 24 * 60 * 60 * 1000 // 14 days
 const CLIENT_TTL_MS = 365 * 24 * 60 * 60 * 1000 // 1 year
 const CLEANUP_INTERVAL_MS = 60 * 1000
 
@@ -49,6 +49,12 @@ export interface OAuthProviderOptions {
      * Defaults to DEFAULT_TRUSTED_REDIRECT_HOSTS.
      */
     trustedRedirectHosts?: string[]
+    /**
+     * Lifetime of an issued access token, in ms. Defaults to one hour.
+     * Shorter narrows the window after a SeaTable token is revoked; longer
+     * spares users a re-prompt if their client renews badly.
+     */
+    accessTokenTtlMs?: number
     /** Resolves the client IP for audit logging. Falls back to 'unknown'. */
     getClientIp?: (req: IncomingMessage) => string
     /**
@@ -113,12 +119,18 @@ export class OAuthProvider {
     private readonly cipher: TokenCipher
     private readonly trustedRedirectHosts: Set<string>
     private readonly getClientIp?: (req: IncomingMessage) => string
+    private readonly accessTokenTtlMs: number
+    private readonly refreshTokenTtlMs: number
     private readonly looksLikeAccountToken?: (token: string) => Promise<boolean>
 
     constructor(options?: OAuthProviderOptions) {
         this.configuredHostname = options?.hostname
         this.validateToken = options?.validateToken
         this.getClientIp = options?.getClientIp
+        this.accessTokenTtlMs = options?.accessTokenTtlMs ?? DEFAULT_ACCESS_TOKEN_TTL_MS
+        // A refresh token that outlives its access token is the whole point, so
+        // never let a long access lifetime silently invert the relationship.
+        this.refreshTokenTtlMs = Math.max(MIN_REFRESH_TOKEN_TTL_MS, this.accessTokenTtlMs)
         this.looksLikeAccountToken = options?.looksLikeAccountToken
         this.trustedRedirectHosts = new Set(
             (options?.trustedRedirectHosts ?? DEFAULT_TRUSTED_REDIRECT_HOSTS)
@@ -551,14 +563,14 @@ export class OAuthProvider {
     }
 
     private issueTokens(res: ServerResponse, apiToken: string, clientId: string): void {
-        const accessToken = this.cipher.seal('access', { t: apiToken }, ACCESS_TOKEN_TTL_MS)
-        const refreshToken = this.cipher.seal('refresh', { t: apiToken, c: clientId }, REFRESH_TOKEN_TTL_MS)
+        const accessToken = this.cipher.seal('access', { t: apiToken }, this.accessTokenTtlMs)
+        const refreshToken = this.cipher.seal('refresh', { t: apiToken, c: clientId }, this.refreshTokenTtlMs)
 
         res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
         res.end(JSON.stringify({
             access_token: accessToken,
             token_type: 'Bearer',
-            expires_in: Math.floor(ACCESS_TOKEN_TTL_MS / 1000),
+            expires_in: Math.floor(this.accessTokenTtlMs / 1000),
             refresh_token: refreshToken,
         }))
     }

@@ -229,6 +229,7 @@ Optional:
 
 - `SEATABLE_MODE` — `selfhosted` (default) or `managed` (multi-tenant HTTP with per-client auth)
 - `SEATABLE_TOKEN_SECRET` — **required in managed mode**, min. 32 chars. Seals issued OAuth tokens and client registrations; must be stable across restarts (`openssl rand -hex 32`)
+- `SEATABLE_ACCESS_TOKEN_TTL` — lifetime of an issued access token in seconds (default `3600`, range `30`–`2592000`). Lower narrows the window after a SeaTable token is revoked; higher spares users a re-prompt if their client renews badly. The refresh token is never issued shorter-lived than the access token.
 - `SEATABLE_MOCK=true` — Enable mock mode for offline testing
 - `CORS_ALLOWED_ORIGINS` — Comma-separated list of allowed origins for CORS (HTTP mode only, disabled if unset)
 - `METRICS_PORT` — Prometheus metrics port (default: `9090`, HTTP mode only)
