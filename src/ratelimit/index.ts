@@ -24,6 +24,14 @@ export class RateLimitManager {
     readonly global = new SlidingWindowLimiter(5000, ONE_MINUTE)
     /** Pre-auth limiter: caps new session creation per IP to prevent token-validation flooding */
     readonly preAuth = new SlidingWindowLimiter(30, ONE_MINUTE)
+    /** All OAuth endpoints, per IP. They carry no session and no credential of their own. */
+    readonly oauth = new SlidingWindowLimiter(30, ONE_MINUTE)
+    /**
+     * POST /authorize specifically. Each submission forwards a candidate token to
+     * SeaTable, so an unthrottled endpoint is an oracle for testing stolen tokens
+     * and an amplifier against our own backend.
+     */
+    readonly tokenSubmission = new SlidingWindowLimiter(10, ONE_MINUTE)
     readonly connections = new ConnectionCounter(20)
 
     private cleanupInterval?: ReturnType<typeof setInterval>
@@ -70,6 +78,8 @@ export class RateLimitManager {
         this.perIp.cleanup()
         this.global.cleanup()
         this.preAuth.cleanup()
+        this.oauth.cleanup()
+        this.tokenSubmission.cleanup()
     }
 
     destroy(): void {

@@ -20,6 +20,17 @@ const EnvSchema = z
     .object({
         SEATABLE_SERVER_URL: z.string().url(),
         SEATABLE_MODE: ServerModeSchema,
+        // Secret used to seal OAuth access/refresh tokens and client registrations.
+        // Required in managed mode; must be stable across restarts.
+        SEATABLE_TOKEN_SECRET: z.string().min(32).optional(),
+        // Lifetime of an issued OAuth access token, in seconds (default 3600).
+        // Between 30 s and 30 days. Lower it to narrow the window after a token
+        // is revoked, raise it if clients renew badly and re-prompt their users.
+        SEATABLE_ACCESS_TOKEN_TTL: z
+            .string()
+            .optional()
+            .transform((v) => (v === undefined || v === '' ? undefined : Number(v)))
+            .pipe(z.number({ message: 'must be a number of seconds' }).int().min(30).max(30 * 24 * 60 * 60).optional()),
         SEATABLE_API_TOKEN: z.string().min(1).optional(),
         // Multi-base: JSON array, e.g. '[{"base_name":"CRM","api_token":"..."}]'
         SEATABLE_BASES: z.string().optional(),
@@ -56,6 +67,16 @@ const EnvSchema = z
             .default('true'),
     })
     .superRefine((data, ctx) => {
+        if (data.SEATABLE_MODE === 'managed' && !data.SEATABLE_TOKEN_SECRET) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message:
+                    'SEATABLE_TOKEN_SECRET (min. 32 chars) is required in managed mode. '
+                    + 'It seals the OAuth tokens; without it the raw SeaTable API token would have to be handed to clients. '
+                    + 'Generate one with: openssl rand -hex 32',
+                path: ['SEATABLE_TOKEN_SECRET'],
+            })
+        }
         if (data.SEATABLE_MODE === 'selfhosted' && !data.SEATABLE_API_TOKEN && !data.SEATABLE_BASES) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
