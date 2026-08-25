@@ -263,7 +263,17 @@ export class OAuthProvider {
         const registration: ClientRegistration = { n: clientName, r: redirectUris }
         const clientId = this.cipher.seal('client', registration, CLIENT_TTL_MS)
 
-        logger.info({ clientName }, 'OAuth dynamic client registration')
+        // The registered callbacks are what /authorize later checks against, so a
+        // rejected authorization is only explainable if they were recorded here.
+        // Both fields come from an unauthenticated caller: cap count and length.
+        logger.info(
+            {
+                clientName,
+                callbacks: redirectUris.slice(0, 5).map((uri) => uri.slice(0, 120)),
+                ip: this.clientIp(req),
+            },
+            'OAuth dynamic client registration',
+        )
 
         res.writeHead(201, { 'content-type': 'application/json' }).end(JSON.stringify({
             client_id: clientId,

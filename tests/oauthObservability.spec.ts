@@ -150,6 +150,31 @@ describe('an issued code is attributable', () => {
     })
 })
 
+describe('a registration is reconstructable', () => {
+    it('records the callbacks a client registered, not just its name', async () => {
+        await registerClient('Acme Client')
+        const reg = find('dynamic client registration')
+        expect(reg).toHaveLength(1)
+        expect(reg[0].fields.clientName).toBe('Acme Client')
+        expect(reg[0].fields.callbacks).toEqual([CB])
+        expect(reg[0].fields.ip).toBe('198.51.100.7')
+    })
+
+    it('caps what an unknown caller can write into the log', async () => {
+        const many = Array.from({ length: 12 }, (_, i) => `https://c${i}.example/${'x'.repeat(400)}`)
+        await fetch(base('/register'), {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.7' },
+            body: JSON.stringify({ client_name: 'Noisy', redirect_uris: many }),
+        })
+        const reg = find('dynamic client registration')
+        expect(reg).toHaveLength(1)
+        const logged = reg[0].fields.callbacks as string[]
+        expect(logged.length).toBeLessThanOrEqual(5)
+        for (const entry of logged) expect(entry.length).toBeLessThanOrEqual(120)
+    })
+})
+
 describe('no rejection path is silent', () => {
     it('logs a missing code_verifier', async () => {
         const clientId = await registerClient()
