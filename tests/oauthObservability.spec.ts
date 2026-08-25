@@ -130,7 +130,9 @@ describe('an issued code is attributable', () => {
         const issued = find('authorization code issued')
         expect(issued).toHaveLength(1)
         expect(issued[0].fields.clientName).toBe('Acme Client')
-        expect(issued[0].fields.callback).toBe('http://127.0.0.1:6611')
+        // The full destination, not just its origin: for an incident the question
+        // is where the code actually went, and registration logs full URIs too.
+        expect(issued[0].fields.callback).toBe(CB)
         expect(issued[0].fields.ip).toBe('198.51.100.7')
     })
 
@@ -177,6 +179,21 @@ describe('an issued code is attributable', () => {
         const rejected = find('invalid API token')
         expect(rejected).toHaveLength(1)
         expect(rejected[0].fields.ip).toBe('198.51.100.99')
+    })
+})
+
+describe('an attacker cannot flood the log through the callback', () => {
+    it('truncates an over-long callback', async () => {
+        const long = 'https://attacker.example/' + 'x'.repeat(500)
+        const clientId = await registerClient()
+        await fetch(base(
+            `/authorize?response_type=code&client_id=${encodeURIComponent(clientId)}`
+            + `&redirect_uri=${encodeURIComponent(long)}`
+            + `&code_challenge=${CHALLENGE}&code_challenge_method=S256`,
+        ), { headers: { 'x-forwarded-for': '198.51.100.66' } })
+        const rejected = find('redirect_uri not registered')
+        expect(rejected).toHaveLength(1)
+        expect((rejected[0].fields.callback as string).length).toBeLessThanOrEqual(200)
     })
 })
 
@@ -260,7 +277,7 @@ describe('no rejection path is silent', () => {
 
         const rejected = find('redirect_uri not registered')
         expect(rejected).toHaveLength(1)
-        expect(rejected[0].fields.callback).toBe('https://attacker.example')
+        expect(rejected[0].fields.callback).toBe('https://attacker.example/cb')
         expect(rejected[0].fields.ip).toBe('198.51.100.66')
     })
 })

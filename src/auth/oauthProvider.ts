@@ -334,14 +334,14 @@ export class OAuthProvider {
         }
 
         if (redirectUri && !this.isPermittedRedirectUri(redirectUri)) {
-            logger.warn({ clientName: client.n, callback: redirectUri.slice(0, 200), ip: this.clientIp(req) }, 'OAuth authorize rejected: callback not permitted')
+            logger.warn({ clientName: client.n, callback: safeCallback(redirectUri), ip: this.clientIp(req) }, 'OAuth authorize rejected: callback not permitted')
             this.authorizeError(res, 'Callback not permitted', 'SeaTable does not deliver authorizations to this kind of address. Nothing has been sent.')
             return
         }
 
         if (!redirectUri || !client.r.some((registered) => redirectUriMatches(registered, redirectUri))) {
             logger.warn(
-                { clientName: client.n, callback: safeOrigin(redirectUri), ip: this.clientIp(req) },
+                { clientName: client.n, callback: safeCallback(redirectUri), ip: this.clientIp(req) },
                 'OAuth authorize rejected: redirect_uri not registered',
             )
             this.authorizeError(res, 'Unregistered callback address', 'This application asked SeaTable to send your authorization to an address it never registered. This is what a phishing attempt looks like — nothing has been sent.')
@@ -370,7 +370,7 @@ export class OAuthProvider {
 
         if (!acknowledged) {
             if (req.method === 'POST') {
-                logger.warn({ clientName: client.n, callback: callbackOrigin, ip: this.clientIp(req) }, 'OAuth authorize: unacknowledged destination')
+                logger.warn({ clientName: client.n, callback: safeCallback(redirectUri), ip: this.clientIp(req) }, 'OAuth authorize: unacknowledged destination')
             }
             // 200 on first view, 400 when a submission tried to skip the step.
             res.writeHead(req.method === 'POST' ? 400 : 200, { 'content-type': 'text/html; charset=utf-8' })
@@ -431,7 +431,7 @@ export class OAuthProvider {
         })
 
         logger.info(
-            { flow: flowId(code), clientName: client.n, callback: callbackOrigin, ip: this.clientIp(req) },
+            { flow: flowId(code), clientName: client.n, callback: safeCallback(redirectUri), ip: this.clientIp(req) },
             'OAuth authorization code issued',
         )
 
@@ -797,13 +797,13 @@ export class OAuthProvider {
  * /authorize and /token log lines can be paired without ever writing the code
  * itself (or a prefix of it) to disk.
  */
-/** Origin of a callback for logging; falls back to a truncated raw value. */
-function safeOrigin(raw: string): string {
-    try {
-        return new URL(raw).origin
-    } catch {
-        return raw.slice(0, 200)
-    }
+/**
+ * A callback as written to the log: the full destination, because for an
+ * incident the question is where the code actually went, not just which host.
+ * The value comes from an unauthenticated caller, so it is capped.
+ */
+function safeCallback(raw: string): string {
+    return raw.slice(0, 200)
 }
 
 /** Short, non-reversible handle for a sealed value that is too long to log. */
