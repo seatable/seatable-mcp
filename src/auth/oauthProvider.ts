@@ -543,6 +543,10 @@ export class OAuthProvider {
             return
         }
 
+        // A silent refresh is the normal, healthy case -- and therefore the one
+        // worth being able to see. Without this line there is no way to tell a
+        // client that renews cleanly from one that re-prompts its user hourly.
+        logger.info({ clientId: fingerprint(payload.c) }, 'OAuth access token refreshed')
         this.issueTokens(res, payload.t, payload.c)
     }
 
@@ -788,6 +792,11 @@ function safeOrigin(raw: string): string {
     } catch {
         return raw.slice(0, 200)
     }
+}
+
+/** Short, non-reversible handle for a sealed value that is too long to log. */
+function fingerprint(value: string): string {
+    return createHash('sha256').update(value).digest('hex').slice(0, 12)
 }
 
 function flowId(code: string): string {

@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from 'node:crypto'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -54,6 +55,35 @@ async function issueCode(clientId: string): Promise<string> {
         redirect: 'manual',
     })
     return new URL(res.headers.get('location')!).searchParams.get('code')!
+}
+
+function b64url(buf: Buffer): string {
+    return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+/** A complete, valid authorization -- the fixed CHALLENGE above has no verifier. */
+async function fullFlow(clientId: string): Promise<{ refresh_token: string }> {
+    const verifier = b64url(randomBytes(32))
+    const challenge = b64url(createHash('sha256').update(verifier).digest())
+    const authorized = await fetch(base('/authorize'), {
+        method: 'POST',
+        headers: {
+            'content-type': 'application/x-www-form-urlencoded',
+            'x-forwarded-for': '198.51.100.7',
+            'sec-fetch-site': 'same-origin',
+        },
+        body: new URLSearchParams({
+            api_token: API_TOKEN, client_id: clientId, redirect_uri: CB,
+            response_type: 'code', code_challenge: challenge, code_challenge_method: 'S256',
+        }).toString(),
+        redirect: 'manual',
+    })
+    const code = new URL(authorized.headers.get('location')!).searchParams.get('code')!
+    const res = await exchange({
+        grant_type: 'authorization_code', code, client_id: clientId,
+        redirect_uri: CB, code_verifier: verifier,
+    })
+    return await res.json()
 }
 
 function exchange(params: Record<string, string>) {
@@ -147,6 +177,33 @@ describe('an issued code is attributable', () => {
         const rejected = find('invalid API token')
         expect(rejected).toHaveLength(1)
         expect(rejected[0].fields.ip).toBe('198.51.100.99')
+    })
+})
+
+describe('token renewal is visible', () => {
+    it('logs a successful refresh, not only a failed one', async () => {
+        const clientId = await registerClient()
+        const first = await fullFlow(clientId)
+        expect(first.refresh_token).toBeTruthy()
+
+        logCalls.length = 0
+        await exchange({ grant_type: 'refresh_token', refresh_token: first.refresh_token, client_id: clientId })
+
+        const refreshed = find('refresh')
+        expect(refreshed.length).toBeGreaterThan(0)
+        expect(refreshed.some((c) => c.msg.toLowerCase().includes('reject'))).toBe(false)
+    })
+
+    it('never writes the refresh token itself to the log', async () => {
+        const clientId = await registerClient()
+        const first = await fullFlow(clientId)
+        expect(first.refresh_token).toBeTruthy()
+
+        logCalls.length = 0
+        await exchange({ grant_type: 'refresh_token', refresh_token: first.refresh_token, client_id: clientId })
+        const serialized = JSON.stringify(logCalls)
+        expect(serialized).not.toContain(first.refresh_token)
+        expect(serialized).not.toContain(API_TOKEN)
     })
 })
 
