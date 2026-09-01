@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 
-import { OAuthProvider } from '../auth/oauthProvider.js'
+import { MCP_RESOURCE_PATH, OAuthProvider, PROTECTED_RESOURCE_PATH } from '../auth/oauthProvider.js'
 import { TokenValidator } from '../auth/tokenValidator.js'
 import { getEnv, type ServerMode, VERSION } from '../config/env.js'
 import { logger } from '../logger.js'
@@ -141,6 +141,18 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
         return candidate
     }
 
+    /**
+     * Reject with 401. In managed mode the response carries the RFC 9728 pointer
+     * a conformant client needs to discover the authorization server — without it
+     * the client cannot begin an OAuth flow at all.
+     */
+    function unauthorized(req: IncomingMessage, res: ServerResponse, message: string, error?: 'invalid_token'): void {
+        const headers: Record<string, string> = { 'content-type': 'text/plain' }
+        const challenge = oauthProvider?.challenge(req, error)
+        if (challenge) headers['www-authenticate'] = challenge
+        res.writeHead(401, headers).end(message)
+    }
+
     const trustProxy = env.TRUST_PROXY ?? true
 
     function getClientIp(req: IncomingMessage): string {
@@ -220,13 +232,13 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
                 const bearer = extractBearerToken(req)
                 if (!bearer) {
                     logger.warn({ ip: getClientIp(req) }, 'Missing Authorization header')
-                    res.writeHead(401, { 'content-type': 'text/plain' }).end('Missing Authorization header')
+                    unauthorized(req, res, 'Missing Authorization header')
                     return
                 }
                 apiToken = await resolveApiToken(bearer)
                 if (!apiToken) {
                     logger.warn({ ip: getClientIp(req) }, 'Invalid API token')
-                    res.writeHead(401, { 'content-type': 'text/plain' }).end('Invalid API token')
+                    unauthorized(req, res, 'Invalid API token', 'invalid_token')
                     return
                 }
             }
@@ -299,13 +311,13 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
                 const bearer = extractBearerToken(req)
                 if (!bearer) {
                     logger.warn({ ip: getClientIp(req), session: sessionFingerprint(sessionId) }, 'Session request without Authorization header')
-                    res.writeHead(401, { 'content-type': 'text/plain' }).end('Missing Authorization header')
+                    unauthorized(req, res, 'Missing Authorization header')
                     return
                 }
                 const apiToken = await resolveApiToken(bearer)
                 if (!apiToken) {
                     logger.warn({ ip: getClientIp(req), session: sessionFingerprint(sessionId) }, 'Session request with invalid credential')
-                    res.writeHead(401, { 'content-type': 'text/plain' }).end('Invalid API token')
+                    unauthorized(req, res, 'Invalid API token', 'invalid_token')
                     return
                 }
                 presentedDigest = digest(apiToken)
@@ -404,6 +416,17 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
         // OAuth endpoints (managed mode only)
         if (oauthProvider && req.method === 'GET' && url.pathname === '/.well-known/oauth-authorization-server') {
             oauthProvider.handleMetadata(req, res)
+            return
+        }
+
+        // Both the bare suffix and the resource-path form: clients differ in which
+        // they probe, and the resource identifier is the only /mcp we serve.
+        if (
+            oauthProvider &&
+            req.method === 'GET' &&
+            (url.pathname === PROTECTED_RESOURCE_PATH || url.pathname === `${PROTECTED_RESOURCE_PATH}${MCP_RESOURCE_PATH}`)
+        ) {
+            oauthProvider.handleProtectedResourceMetadata(req, res)
             return
         }
 
