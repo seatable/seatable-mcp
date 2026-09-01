@@ -88,6 +88,12 @@ const LOOPBACK_HOSTS = new Set(['127.0.0.1', '::1', '[::1]', 'localhost'])
  */
 export const DEFAULT_TRUSTED_REDIRECT_HOSTS = ['claude.ai', 'claude.com', 'chatgpt.com']
 
+/** The protected resource clients authorize against — the Streamable HTTP endpoint. */
+export const MCP_RESOURCE_PATH = '/mcp'
+
+/** RFC 9728 well-known prefix. The resource path is appended to it. */
+export const PROTECTED_RESOURCE_PATH = '/.well-known/oauth-protected-resource'
+
 /** Schemes that can execute or read local content and must never be a callback. */
 const FORBIDDEN_SCHEMES = new Set(['javascript', 'data', 'file', 'blob', 'vbscript', 'about', 'view-source'])
 
@@ -236,6 +242,54 @@ export class OAuthProvider {
             code_challenge_methods_supported: ['S256'],
         }
         res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(metadata))
+    }
+
+    /**
+     * The resource identifier clients authorize against: the MCP endpoint itself.
+     */
+    private resourceIdentifier(req: IncomingMessage): string {
+        return `${this.resolveBaseUrl(req)}${MCP_RESOURCE_PATH}`
+    }
+
+    /**
+     * Where the protected resource metadata for that identifier lives.
+     *
+     * RFC 9728 section 3.1: the resource's path is appended to the well-known
+     * suffix, so `https://host/mcp` is described at
+     * `https://host/.well-known/oauth-protected-resource/mcp`.
+     */
+    resourceMetadataUrl(req: IncomingMessage): string {
+        return `${this.resolveBaseUrl(req)}${PROTECTED_RESOURCE_PATH}${MCP_RESOURCE_PATH}`
+    }
+
+    /**
+     * GET /.well-known/oauth-protected-resource[/mcp] — RFC 9728 metadata
+     *
+     * `authorization_servers` MUST agree with the issuer that handleMetadata()
+     * reports. A conformant client follows this document INSTEAD of probing
+     * /.well-known/oauth-authorization-server, so a disagreement here breaks
+     * clients that work today. Both derive from resolveBaseUrl() for that reason.
+     */
+    handleProtectedResourceMetadata(req: IncomingMessage, res: ServerResponse): void {
+        const metadata = {
+            resource: this.resourceIdentifier(req),
+            authorization_servers: [this.resolveBaseUrl(req)],
+            bearer_methods_supported: ['header'],
+            resource_documentation: 'https://github.com/seatable/seatable-mcp',
+        }
+        res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(metadata))
+    }
+
+    /**
+     * The WWW-Authenticate challenge for a 401, pointing at the metadata above.
+     *
+     * RFC 6750 section 3.1: a request that carried no credential at all gets no
+     * error code — only one that presented a credential we rejected does.
+     */
+    challenge(req: IncomingMessage, error?: 'invalid_token'): string {
+        const params = [`resource_metadata="${this.resourceMetadataUrl(req)}"`]
+        if (error) params.unshift(`error="${error}"`)
+        return `Bearer ${params.join(', ')}`
     }
 
     /**
