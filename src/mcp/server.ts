@@ -262,9 +262,26 @@ export class SeaTableMCPServer {
 
         const start = Date.now()
         toolCallsByToolTotal.inc({ tool: toolName })
+        // Read inside runWithBase(): once the scope has returned, the AsyncLocalStorage
+        // store is gone and ContextualClient cannot resolve a base in multi-base mode.
+        let baseInfo: { dtableUuid?: string; appName?: string } = {}
+        const captureBaseInfo = () => {
+            try {
+                baseInfo = this.client.getBaseInfo?.() ?? {}
+            } catch {
+                // Base could not be resolved (e.g. missing or unknown "base" argument);
+                // the log line then simply omits the base fields.
+            }
+        }
         try {
             // Wrap handler to support thread-safe multi-base routing via AsyncLocalStorage
-            const runHandler = () => tool.handler(request.params.arguments)
+            const runHandler = async () => {
+                try {
+                    return await tool.handler(request.params.arguments)
+                } finally {
+                    captureBaseInfo()
+                }
+            }
             const result = this.contextualClient
                 ? await this.contextualClient.runWithBase(
                     (request.params.arguments as Record<string, unknown> | undefined)?.base as string | undefined,
@@ -273,7 +290,6 @@ export class SeaTableMCPServer {
                 : await runHandler()
             const durationMs = Date.now() - start
             const durationSec = durationMs / 1000
-            const baseInfo = this.client.getBaseInfo?.() ?? {}
             logger.info({
                 ...logCtx,
                 ...(baseInfo.dtableUuid && { dtable_uuid: baseInfo.dtableUuid }),
@@ -286,7 +302,6 @@ export class SeaTableMCPServer {
         } catch (error) {
             const durationMs = Date.now() - start
             const durationSec = durationMs / 1000
-            const baseInfo = this.client.getBaseInfo?.() ?? {}
             const errorCode = (error as CodedError)?.code
             const isClientError = typeof errorCode === 'string' && CLIENT_ERROR_CODES.has(errorCode)
 
