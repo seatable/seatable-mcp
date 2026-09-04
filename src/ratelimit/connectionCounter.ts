@@ -2,7 +2,7 @@
  * Tracks concurrent connections per key with a configurable limit.
  */
 export class ConnectionCounter {
-    private readonly maxConnections: number
+    readonly maxConnections: number
     private readonly counts = new Map<string, number>()
 
     constructor(maxConnections: number) {
@@ -23,5 +23,10 @@ export class ConnectionCounter {
         } else {
             this.counts.set(key, current - 1)
         }
+    }
+
+    /** Slots currently held for a key — for diagnosing an exhausted pool. */
+    active(key: string): number {
+        return this.counts.get(key) ?? 0
     }
 }

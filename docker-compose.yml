@@ -23,6 +23,11 @@ services:
     labels:
       caddy: ${SEATABLE_MCP_HOSTNAME}
       caddy.reverse_proxy: "{{upstreams 3000}}"
+      # Replace X-Forwarded-For instead of appending to it. Caddy appends by
+      # default, which leaves a client-supplied value in front of the real peer
+      # — and that value is what rate limiting would be keyed on. Overwriting
+      # here means the header carries exactly one hop: the actual client.
+      caddy.reverse_proxy.header_up: "X-Forwarded-For {remote_host}"
     environment:
       - SEATABLE_SERVER_URL
       - SEATABLE_API_TOKEN
