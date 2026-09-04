@@ -311,3 +311,41 @@ describe('validateRowsAgainstSchema', () => {
     })
   })
 })
+
+// Regression: the shape produced by mapMetadataToGeneric must validate correctly.
+// mapMetadataToGeneric flattens select options to a string array ({ options: ['open'] }),
+// while the fixtures above use the raw SeaTable object form ({ options: [{ name: 'open' }] }).
+// Both must be accepted — see ticket "unknown option ... Valid options: <empty>".
+describe('select validation against mapped schema shape', () => {
+  const mappedSchema: GenericSchema = {
+    base_id: 'base1',
+    tables: [
+      {
+        id: 'tbl1',
+        name: 'Tasks',
+        columns: [
+          { id: 'col1', name: 'Title', type: 'text' },
+          { id: 'col2', name: 'Statut', type: 'single_select', options: { options: ['En cours', 'Reconnu'] } },
+          { id: 'col3', name: 'Tags', type: 'multi_select', options: { options: ['urgent', 'low'] } },
+        ],
+      },
+    ],
+  }
+
+  it('accepts a valid single-select option', () => {
+    const rows = [{ Title: 'A', Statut: 'En cours' }]
+    validateRowsAgainstSchema(mappedSchema, 'Tasks', rows)
+  })
+
+  it('accepts valid multi-select options', () => {
+    const rows = [{ Title: 'A', Tags: ['urgent'] }]
+    validateRowsAgainstSchema(mappedSchema, 'Tasks', rows)
+  })
+
+  it('still rejects an unknown option and lists the valid ones', () => {
+    const rows = [{ Title: 'A', Statut: 'Nope' }]
+    expect(() => validateRowsAgainstSchema(mappedSchema, 'Tasks', rows)).toThrowError(
+      'unknown option "Nope". Valid options: En cours, Reconnu'
+    )
+  })
+})
