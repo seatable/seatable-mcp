@@ -300,7 +300,7 @@ The metrics server only starts in HTTP mode (not stdio) and binds to `0.0.0.0` �
 
 - **`get_row_activities`** — Get change history of a row (who changed what, when, old/new values)
 - **`create_snapshot`** — Create a snapshot of the current base (10 min cooldown)
-- **`add_select_options`** — Add new options to single-select or multi-select columns
+- **`add_select_options`** — Add new options to single-select or multi-select columns (existing options are skipped, no duplicates)
 - **`ping_seatable`** — Health check with latency monitoring
 
 ## Supported Column Types

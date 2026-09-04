@@ -132,9 +132,14 @@ function validateDate(colName: string, value: unknown): void {
 }
 
 function getSelectOptions(col: GenericColumn): Set<string> {
-    const opts = col.options?.options as Array<{ name: string }> | undefined
+    // Options arrive in two shapes: the raw SeaTable form ([{ name, id, color }])
+    // and the flattened form produced by mapMetadataToGeneric (["open", "closed"]).
+    const opts = col.options?.options as Array<{ name?: unknown } | string> | undefined
     if (!Array.isArray(opts)) return new Set()
-    return new Set(opts.map((o) => o.name))
+    const names = opts
+        .map((o) => (typeof o === 'string' ? o : (o as { name?: unknown })?.name))
+        .filter((n): n is string => typeof n === 'string' && n !== '')
+    return new Set(names)
 }
 
 function validateSingleSelect(colName: string, value: unknown, col: GenericColumn): void {
