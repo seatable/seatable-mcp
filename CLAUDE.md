@@ -88,6 +88,12 @@ The server adapter in `server.ts` collects these registrations into an internal 
 
 `ClientRegistry` (`src/seatable/clientRegistry.ts`) manages multiple `SeaTableClient` instances keyed by base name. `ContextualClient` (`src/seatable/contextualClient.ts`) implements `ClientLike` and proxies calls to the right client based on a `base` parameter. In multi-base mode, `handleCallTool()` extracts the `base` arg and `handleListTools()` injects it into every tool schema dynamically — no changes needed in individual tool files.
 
+### Multi-base and the base context
+
+`ContextualClient` binds the target base to an `AsyncLocalStorage` scope opened by `runWithBase()`, which `handleCallTool()` wraps around the tool handler. **Everything that needs the client must read it inside that scope.** Reading after it returns throws `ContextualClient was used outside runWithBase()` — deliberately, and identically whether one base or ten are configured.
+
+That guard exists because the opposite behaviour hid a bug for five months (fixed in #5): the post-handler log line called `getBaseInfo()` after the scope had closed. With a single base it silently succeeded via the registry default; with two or more `resolve(undefined)` threw `Multiple bases available … Specify "base" parameter`, which reads like a caller mistake and discarded a result the handler had already produced correctly. Coverage is in `tests/contextualClient.spec.ts` and `tests/server.spec.ts`.
+
 ### Schema Utilities
 
 - `src/schema/map.ts` — converts SeaTable metadata to `GenericSchema` format

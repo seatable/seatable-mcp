@@ -3,7 +3,12 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import type { ClientLike } from '../mcp/tools/types.js'
 import type { ClientRegistry } from './clientRegistry.js'
 
-const baseContext = new AsyncLocalStorage<string | undefined>()
+/**
+ * The store is an object rather than the bare name so that "no scope at all"
+ * (getStore() === undefined) stays distinguishable from "in a scope, no base
+ * named" ({ base: undefined }). Those two need very different errors.
+ */
+const baseContext = new AsyncLocalStorage<{ base?: string }>()
 
 /**
  * A ClientLike proxy that delegates to a specific base client
@@ -24,11 +29,26 @@ export class ContextualClient implements ClientLike {
      * will route to the specified base.
      */
     runWithBase<T>(name: string | undefined, fn: () => T): T {
-        return baseContext.run(name, fn)
+        return baseContext.run({ base: name }, fn)
     }
 
+    /**
+     * Resolving outside a runWithBase() scope is always a programming error, and
+     * it used to hide well: with a single base it quietly succeeded via the
+     * registry default, and only with two or more did it surface — as "Specify
+     * base parameter", which blames the caller for omitting an argument they
+     * did supply. It cost five months to find that way once, so it is named
+     * here and fails the same way whatever the base count.
+     */
     private get client(): ClientLike {
-        return this.registry.resolve(baseContext.getStore())
+        const store = baseContext.getStore()
+        if (!store) {
+            throw new Error(
+                'ContextualClient was used outside runWithBase(). The base context only exists for the '
+                + 'duration of that scope — read what you need inside it rather than after it returns.'
+            )
+        }
+        return this.registry.resolve(store.base)
     }
 
     // Base info
