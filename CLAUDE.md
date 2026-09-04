@@ -50,6 +50,15 @@ Copy `.env.example` to `.env` for local development.
 - **Selfhosted** (default): Single API token from env, one client per process. Supports multi-base via `SEATABLE_BASES`.
 - **Managed** (`SEATABLE_MODE=managed`): HTTP-only, each client authenticates with their own Bearer token **on every request** — the `mcp-session-id` header is a routing value, never a credential, and a request must resolve to the identity that created the session. Token validated against SeaTable (`src/auth/tokenValidator.ts`) with positive (1 min) / negative (1 min) cache. Rate limiting via `src/ratelimit/` (per-token, per-IP, global, concurrent connections).
 
+### Connection slots and session lifetime
+
+The concurrent-connection limit (20, per API token, `src/ratelimit/index.ts`) is acquired on session creation and released on `DELETE`, transport close, or by the idle sweeper. Two rules keep the pool from silting up, both covered by `tests/connectionSlots.spec.ts`:
+
+- An initialize request that never produces a session (malformed body, aborted client) releases its slot from `res.on('close')`. Without that the slot is unreachable — the transport never opened, so `onclose` never fires, and the sweeper never sees a session that was never registered.
+- A session that initialized but never made a call is reclaimed after **30 s** (`unusedSessionTimeoutMs`) instead of the ordinary 10-minute idle timeout. Reconnect-happy clients leave these behind by the dozen; each one holds a slot.
+
+Client IP for rate limiting comes from the **rightmost** `X-Forwarded-For` entry — the hop our own proxy appended. The leftmost entry is client-supplied and would let a caller pick its own rate-limit bucket. `docker-compose.yml` additionally has Caddy overwrite the header rather than append to it.
+
 ### OAuth (managed mode)
 
 `src/auth/oauthProvider.ts` bridges SeaTable API tokens into an OAuth 2.0 authorization code flow. Client registrations and issued tokens are **stateless sealed envelopes** (`src/auth/tokenCipher.ts`, AES-256-GCM keyed from `SEATABLE_TOKEN_SECRET`), so no server-side store is needed and they survive restarts. The `client_id` carries the client's registered `redirect_uris`; `/authorize` rejects anything it cannot open. PKCE `S256` is mandatory and every code is bound to client + exact callback + challenge. The raw SeaTable API token is never returned — `resolveAccessToken()` unseals it server-side.

@@ -17,6 +17,12 @@ export interface StartHttpServerOptions {
     port?: number
     /** Session idle timeout in ms (default: 10 minutes) */
     sessionIdleTimeoutMs?: number
+    /**
+     * Idle timeout for a session that initialized but never made a call
+     * (default: 30 seconds). These are the sessions a reconnect-happy client
+     * leaves behind, and each one holds a connection slot while it lives.
+     */
+    unusedSessionTimeoutMs?: number
     /** Interval for checking idle sessions in ms (default: 60 seconds) */
     sessionCheckIntervalMs?: number
 }
@@ -26,6 +32,8 @@ type ActiveSession = {
     apiToken?: string
     /** Digest of the SeaTable API token that created this session; every later request must resolve to the same one. */
     apiTokenDigest?: Buffer
+    /** False until the client makes its first call. Sessions that never do are reclaimed far sooner. */
+    used: boolean
     lastActivity: number
     close: () => Promise<void>
 }
@@ -37,6 +45,11 @@ function digest(value: string): Buffer {
 /** Session IDs are credentials-adjacent routing values — log a fingerprint, never the value. */
 function sessionFingerprint(sessionId: string): string {
     return createHash('sha256').update(sessionId).digest('hex').slice(0, 12)
+}
+
+/** Same rule for API tokens: enough to correlate one tenant's lines, never the credential. */
+function tokenFingerprint(apiToken: string): string {
+    return createHash('sha256').update(apiToken).digest('hex').slice(0, 12)
 }
 
 const MAX_BODY_SIZE = 10 * 1024 * 1024 // 10 MB
@@ -155,10 +168,21 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
 
     const trustProxy = env.TRUST_PROXY ?? true
 
+    /**
+     * The rightmost X-Forwarded-For entry is the one our own reverse proxy
+     * appended, so it is the only one a client cannot forge. Reading the
+     * leftmost entry instead let a client choose its own rate-limit bucket:
+     * evade the per-IP limit by rotating the header, or poison the bucket
+     * another tenant is being counted in.
+     */
     function getClientIp(req: IncomingMessage): string {
         if (trustProxy) {
             const forwarded = req.headers['x-forwarded-for']
-            if (typeof forwarded === 'string') return forwarded.split(',')[0].trim()
+            const chain = Array.isArray(forwarded) ? forwarded.join(',') : forwarded
+            if (typeof chain === 'string') {
+                const hops = chain.split(',').map((hop) => hop.trim()).filter(Boolean)
+                if (hops.length > 0) return hops[hops.length - 1]
+            }
         }
         return req.socket.remoteAddress ?? 'unknown'
     }
@@ -246,7 +270,15 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
             // Connection limit (managed mode)
             if (rateLimiter && apiToken) {
                 if (!rateLimiter.connections.acquire(apiToken)) {
-                    logger.warn({ ip: getClientIp(req) }, 'Connection limit exceeded')
+                    logger.warn(
+                        {
+                            ip: getClientIp(req),
+                            token: tokenFingerprint(apiToken),
+                            active: rateLimiter.connections.active(apiToken),
+                            limit: rateLimiter.connections.maxConnections,
+                        },
+                        'Connection limit exceeded'
+                    )
                     res.writeHead(429, { 'content-type': 'text/plain' }).end('Too many concurrent connections')
                     return
                 }
@@ -254,15 +286,18 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
             }
 
             const mcpServer = buildServer(apiToken ? { apiToken } : undefined)
+            let sessionEstablished = false
             const transport = new StreamableHTTPServerTransport({
                 sessionIdGenerator: () => randomUUID(),
                 onsessioninitialized: (id) => {
+                    sessionEstablished = true
                     mcpServer.setSessionId(id)
                     logger.info({ session: sessionFingerprint(id) }, 'Session initialized')
                     sessions.set(id, {
                         transport,
                         apiToken,
                         apiTokenDigest: apiToken ? digest(apiToken) : undefined,
+                        used: false,
                         lastActivity: Date.now(),
                         close: cleanup,
                     })
@@ -274,7 +309,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
             const cleanup = async () => {
                 if (cleaned) return
                 cleaned = true
-                activeSessions.dec()
+                if (sessionEstablished) activeSessions.dec()
                 if (apiToken && rateLimiter) {
                     rateLimiter.connections.release(apiToken)
                     activeConnections.dec()
@@ -297,6 +332,17 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
             transport.onclose = () => {
                 void cleanup()
             }
+
+            /*
+             * An initialize request that never produces a session — a malformed
+             * body the SDK rejects, a client that hangs up, a transport error —
+             * leaves the transport unopened, so `onclose` never fires and the
+             * idle sweeper never sees it either. Without this the slot it took
+             * above was held until the process restarted.
+             */
+            res.on('close', () => {
+                if (!sessionEstablished) void cleanup()
+            })
 
             await mcpServer.connect(transport)
             await transport.handleRequest(req, res, body)
@@ -339,6 +385,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
                 }
             }
 
+            session.used = true
             session.lastActivity = Date.now()
             await session.transport.handleRequest(req, res, body)
             return
@@ -483,11 +530,16 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
     // Idle session cleanup
     const sessionIdleTimeoutMs = options.sessionIdleTimeoutMs ?? 10 * 60 * 1000
     const sessionCheckIntervalMs = options.sessionCheckIntervalMs ?? 60 * 1000
+    // A session that never made a call gets a much shorter leash than one doing
+    // real work — it is holding a connection slot for nothing. Never longer
+    // than the ordinary idle timeout, whatever the caller passes.
+    const unusedSessionTimeoutMs = Math.min(options.unusedSessionTimeoutMs ?? 30 * 1000, sessionIdleTimeoutMs)
     const idleCheckInterval = setInterval(() => {
         const now = Date.now()
         for (const [sessionId, session] of sessions.entries()) {
-            if (now - session.lastActivity > sessionIdleTimeoutMs) {
-                logger.info({ session: sessionFingerprint(sessionId) }, 'Closing idle session')
+            const timeout = session.used ? sessionIdleTimeoutMs : unusedSessionTimeoutMs
+            if (now - session.lastActivity > timeout) {
+                logger.info({ session: sessionFingerprint(sessionId), used: session.used }, 'Closing idle session')
                 void session.close()
             }
         }
