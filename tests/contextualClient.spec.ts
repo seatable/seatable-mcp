@@ -74,6 +74,37 @@ describe('ContextualClient', () => {
         expect(() => ctx.runWithBase(undefined, () => ctx.listTables())).toThrow('Specify "base" parameter')
     })
 
+    /*
+     * The failure mode this guards against cost five months to find: reading the
+     * client after the runWithBase() scope returned. With one base it silently
+     * worked (resolve(undefined) fell back to the default), with two it failed as
+     * "Specify base parameter" — which reads like the caller forgot an argument
+     * they had in fact supplied. Both halves are wrong, so the escape is named.
+     */
+    it('throws a diagnostic error when used outside runWithBase()', () => {
+        const registry = createMockRegistry(['A', 'B'])
+        const ctx = new ContextualClient(registry as any)
+
+        expect(() => ctx.getBaseInfo()).toThrow(/outside runWithBase/)
+    })
+
+    it('throws the same diagnostic outside the scope even with a single base', () => {
+        // The single-base case used to succeed here, which is exactly what kept
+        // the defect invisible until someone configured a second base.
+        const registry = createMockRegistry(['OnlyBase'])
+        const ctx = new ContextualClient(registry as any)
+
+        expect(() => ctx.listTables()).toThrow(/outside runWithBase/)
+    })
+
+    it('still reports a genuinely missing base argument inside the scope', () => {
+        const registry = createMockRegistry(['A', 'B'])
+        const ctx = new ContextualClient(registry as any)
+
+        // Inside the scope with no name, the caller really did omit "base".
+        expect(() => ctx.runWithBase(undefined, () => ctx.listTables())).toThrow('Specify "base" parameter')
+    })
+
     it('throws for unknown base name', () => {
         const registry = createMockRegistry(['CRM'])
         const ctx = new ContextualClient(registry as any)
