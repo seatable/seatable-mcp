@@ -276,7 +276,7 @@ The metrics server only starts in HTTP mode (not stdio) and binds to `0.0.0.0` �
 - **`get_row`** — Retrieve specific row by ID
 - **`find_rows`** — Client-side filtering with DSL
 - **`search_rows`** — Search via SQL WHERE clauses
-- **`query_sql`** — Execute SQL queries with parameterized inputs
+- **`query_sql`** — Read-only SELECT queries with parameterized inputs
 
 ### Writing Data
 
@@ -285,6 +285,7 @@ The metrics server only starts in HTTP mode (not stdio) and binds to `0.0.0.0` �
 - **`update_rows`** — Batch update rows
 - **`upsert_rows`** — Insert or update rows by key columns
 - **`delete_rows`** — Remove rows by ID
+- **`execute_sql`** — SQL UPDATE, DELETE or INSERT with parameterized inputs
 
 ### Files
 
