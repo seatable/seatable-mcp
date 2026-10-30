@@ -94,6 +94,12 @@ The server adapter in `server.ts` collects these registrations into an internal 
 
 That guard exists because the opposite behaviour hid a bug for five months (fixed in #5): the post-handler log line called `getBaseInfo()` after the scope had closed. With a single base it silently succeeded via the registry default; with two or more `resolve(undefined)` threw `Multiple bases available … Specify "base" parameter`, which reads like a caller mistake and discarded a result the handler had already produced correctly. Coverage is in `tests/contextualClient.spec.ts` and `tests/server.spec.ts`.
 
+### SQL tools
+
+`query_sql` (SELECT, read-only) and `execute_sql` (UPDATE/DELETE/INSERT, destructive) are separate because Anthropic's connector directory rejects tools that mix safe and unsafe operations. Both go through `runSql()` in `src/mcp/tools/sqlCheck.ts`, which rejects constructs SeaTable SQL never accepts (subqueries, WITH, UNION, JOIN keyword, window functions, multiple statements) before the request and appends SeaTable function names to errors caused by MySQL functions. Function names only produce hints after a failure, never a rejection, so a function SeaTable adds later can't be blocked.
+
+Every failure is logged as `SQL statement failed` with `reasons` and `sql_shape` and counted in `mcp_sql_failures_total`. `sqlShape()` removes all customer content — literals become `?`/`0`, table and column names become `x` — so the log shows which constructs models get wrong without storing data. Never log the raw statement or its parameters.
+
 ### Schema Utilities
 
 - `src/schema/map.ts` — converts SeaTable metadata to `GenericSchema` format

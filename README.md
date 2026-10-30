@@ -252,6 +252,7 @@ Available metrics:
 | `mcp_http_requests_total{method, status}` | Counter | HTTP requests by method and status code |
 | `mcp_rate_limit_exceeded_total{type}` | Counter | Rate limit rejections (global/per_ip/per_token) |
 | `mcp_auth_validations_total{result}` | Counter | Auth validations (success/failure/cache_hit) |
+| `mcp_sql_failures_total{tool, reason}` | Counter | Failed `query_sql`/`execute_sql` calls (e.g. `subquery`, `join`, `wrong_statement_update`, `seatable_error`) |
 | `mcp_active_sessions` | Gauge | Currently active HTTP sessions |
 | `mcp_active_connections` | Gauge | Currently active connections |
 | `seatable_api_requests_total{operation, status}` | Counter | SeaTable API calls by operation |

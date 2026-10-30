@@ -1,4 +1,6 @@
-import { makeError } from '../../errors.js'
+import { type CodedError, makeError } from '../../errors.js'
+import { logger } from '../../logger.js'
+import { sqlFailuresTotal } from '../../metrics/index.js'
 
 /**
  * Static checks for SeaTable SQL. SeaTable implements a restricted SQL dialect;
@@ -57,28 +59,34 @@ export function statementKind(sql: string): StatementKind {
     return word === 'select' || word === 'update' || word === 'delete' || word === 'insert' ? word : 'other'
 }
 
-const UNSUPPORTED_CONSTRUCTS: Array<{ pattern: RegExp; message: string }> = [
+const UNSUPPORTED_CONSTRUCTS: Array<{ reason: string; pattern: RegExp; message: string }> = [
     {
+        reason: 'cte',
         pattern: /^\s*with\b/i,
         message: 'Common table expressions (WITH ... AS) are not supported. Run the inner query on its own first and use its results in a second query.',
     },
     {
+        reason: 'subquery',
         pattern: /\(\s*select\b/i,
         message: 'Subqueries are not supported. Run the inner SELECT on its own first, then pass its values into the outer query, e.g. WHERE `Col` IN (?, ?, ?) with parameters.',
     },
     {
+        reason: 'set_operation',
         pattern: /\b(union|intersect|except)\b/i,
         message: 'UNION, INTERSECT and EXCEPT are not supported. Run one query per part and combine the results yourself.',
     },
     {
+        reason: 'join',
         pattern: /\bjoin\b/i,
         message: 'The JOIN keyword is not supported. Use an implicit inner join: FROM `T1`, `T2` WHERE `T1`.`col` = `T2`.`col`. Outer joins are not available; query the tables separately instead.',
     },
     {
+        reason: 'window_function',
         pattern: /\bover\s*\(/i,
         message: 'Window functions (OVER ...) are not supported. Use GROUP BY for aggregates, or compute rankings from the returned rows.',
     },
     {
+        reason: 'multiple_statements',
         pattern: /;\s*\S/,
         message: 'Only one statement per call is supported. Send each statement in its own call.',
     },
@@ -91,9 +99,13 @@ const UNSUPPORTED_CONSTRUCTS: Array<{ pattern: RegExp; message: string }> = [
  */
 export function assertSupportedSql(sql: string): void {
     const stripped = stripLiterals(sql)
-    const problems = UNSUPPORTED_CONSTRUCTS.filter(c => c.pattern.test(stripped)).map(c => c.message)
+    const problems = UNSUPPORTED_CONSTRUCTS.filter(c => c.pattern.test(stripped))
     if (problems.length) {
-        throw makeError('ERR_VALIDATION', `SeaTable SQL does not support this query. ${problems.join(' ')}`)
+        throw makeError(
+            'ERR_VALIDATION',
+            `SeaTable SQL does not support this query. ${problems.map(c => c.message).join(' ')}`,
+            { reasons: problems.map(c => c.reason) },
+        )
     }
 }
 
@@ -135,12 +147,82 @@ export function functionHints(sql: string): string[] {
     return FUNCTION_HINTS.filter(h => h.pattern.test(stripped)).map(h => h.hint)
 }
 
-/** Run a statement and append function-name hints to SeaTable's error message. */
-export async function withSqlHints<T>(sql: string, run: () => Promise<T>): Promise<T> {
+const SQL_KEYWORDS = new Set([
+    'select', 'distinct', 'from', 'where', 'and', 'or', 'not', 'in', 'is', 'null', 'like', 'ilike', 'between',
+    'group', 'by', 'having', 'order', 'asc', 'desc', 'limit', 'offset', 'as', 'update', 'set', 'delete', 'insert',
+    'into', 'values', 'join', 'left', 'right', 'inner', 'outer', 'full', 'cross', 'on', 'union', 'all', 'intersect',
+    'except', 'with', 'over', 'partition', 'case', 'when', 'then', 'else', 'end', 'true', 'false', 'has', 'any',
+    'of', 'none', 'exactly',
+])
+
+const MAX_SHAPE_LENGTH = 500
+
+/**
+ * The structure of a statement with all customer content removed, for logs.
+ * Literals become ? or 0, table and column names become x, so only keywords,
+ * function names and punctuation survive:
+ *   SELECT `Name` FROM `Kunden` WHERE mid(`PLZ`, 1, 2) = '55'
+ *   → SELECT `x` FROM `x` WHERE mid(`x`, 0, 0) = ?
+ */
+export function sqlShape(sql: string): string {
+    const shape = stripLiterals(sql)
+        .replace(/''/g, '?')
+        .replace(/\b\d+(\.\d+)?\b/g, '0')
+        .replace(/\b[a-z_][a-z0-9_]*\b(?=(\s*\()?)/gi, (word, call) => {
+            const lower = word.toLowerCase()
+            if (SQL_KEYWORDS.has(lower)) return word.toUpperCase()
+            return call ? lower : 'x'
+        })
+        .replace(/\s+/g, ' ')
+        .trim()
+    return shape.length > MAX_SHAPE_LENGTH ? `${shape.slice(0, MAX_SHAPE_LENGTH)}…` : shape
+}
+
+type SqlTool = 'query_sql' | 'execute_sql'
+
+const ALLOWED_KINDS: Record<SqlTool, { kinds: StatementKind[]; reject: (kind: StatementKind) => string }> = {
+    query_sql: {
+        kinds: ['select'],
+        reject: () => 'query_sql only runs SELECT statements. Use execute_sql for UPDATE, DELETE or INSERT.',
+    },
+    execute_sql: {
+        kinds: ['update', 'delete', 'insert'],
+        reject: kind => kind === 'select'
+            ? 'execute_sql does not run SELECT statements. Use query_sql to read data.'
+            : 'execute_sql only runs UPDATE, DELETE or INSERT statements.',
+    },
+}
+
+function recordFailure(tool: SqlTool, sql: string, reasons: string[], hints: string[] = []): void {
+    for (const reason of reasons) sqlFailuresTotal.inc({ tool, reason })
+    logger.warn({ tool, reasons, sql_shape: sqlShape(sql), ...(hints.length && { hints }) }, 'SQL statement failed')
+}
+
+/**
+ * Check a statement for the given tool and run it. Every failure is counted
+ * and logged as a content-free shape (see sqlShape), so the patterns models
+ * get wrong can be analysed without storing customer data.
+ */
+export async function runSql<T>(tool: SqlTool, sql: string, run: () => Promise<T>): Promise<T> {
+    try {
+        assertSupportedSql(sql)
+    } catch (err) {
+        recordFailure(tool, sql, ((err as CodedError).meta?.reasons as string[]) ?? ['unsupported'])
+        throw err
+    }
+
+    const kind = statementKind(sql)
+    const { kinds, reject } = ALLOWED_KINDS[tool]
+    if (!kinds.includes(kind)) {
+        recordFailure(tool, sql, [`wrong_statement_${kind}`])
+        throw makeError('ERR_VALIDATION', reject(kind))
+    }
+
     try {
         return await run()
     } catch (err) {
         const hints = functionHints(sql)
+        recordFailure(tool, sql, ['seatable_error'], hints)
         if (hints.length && err instanceof Error) {
             err.message = `${err.message} Hint: ${hints.join('; ')}.`
         }

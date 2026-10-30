@@ -1,7 +1,6 @@
 import { z } from 'zod'
 
-import { makeError } from '../../errors.js'
-import { assertSupportedSql, SQL_SYNTAX_RULES, statementKind, withSqlHints } from './sqlCheck.js'
+import { runSql, SQL_SYNTAX_RULES } from './sqlCheck.js'
 import { ToolRegistrar } from './types.js'
 import { cleanSqlMetadata } from './utils.js'
 
@@ -29,15 +28,7 @@ INSERT only works with Big Data storage enabled (Enterprise). For non-archived t
         },
         async (args: unknown) => {
             const { sql, parameters } = InputSchema.parse(args)
-            assertSupportedSql(sql)
-            const kind = statementKind(sql)
-            if (kind === 'select') {
-                throw makeError('ERR_VALIDATION', 'execute_sql does not run SELECT statements. Use query_sql to read data.')
-            }
-            if (kind === 'other') {
-                throw makeError('ERR_VALIDATION', 'execute_sql only runs UPDATE, DELETE or INSERT statements.')
-            }
-            const result = await withSqlHints(sql, () => client.querySql(sql, parameters))
+            const result = await runSql('execute_sql', sql, () => client.querySql(sql, parameters))
             return {
                 content: [{
                     type: 'text',

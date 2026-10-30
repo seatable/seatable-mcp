@@ -1,9 +1,10 @@
-import { beforeAll, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { makeError } from '../src/errors'
+import { logger } from '../src/logger'
 import { buildServer, SeaTableMCPServer } from '../src/mcp/server'
 import { registerQuerySql } from '../src/mcp/tools/querySql'
-import { assertSupportedSql, functionHints, statementKind, stripLiterals } from '../src/mcp/tools/sqlCheck'
+import { assertSupportedSql, functionHints, sqlShape, statementKind, stripLiterals } from '../src/mcp/tools/sqlCheck'
 
 describe('stripLiterals', () => {
     it('neutralises strings, quoted identifiers and comments', () => {
@@ -75,6 +76,31 @@ describe('functionHints', () => {
     })
 })
 
+describe('sqlShape', () => {
+    it('keeps keywords and function names, drops names and values', () => {
+        expect(sqlShape("SELECT `Name`, Umsatz FROM `Kunden` WHERE mid(`PLZ`, 1, 2) = '55' AND Ort ilike \"%mainz%\""))
+            .toBe('SELECT `x`, x FROM `x` WHERE mid(`x`, 0, 0) = ? AND x ILIKE ?')
+        expect(sqlShape('update Kunden set Status = ? where Umsatz > 1000.50'))
+            .toBe('UPDATE x SET x = ? WHERE x > 0')
+    })
+
+    it('keeps the constructs the logs are meant to reveal', () => {
+        expect(sqlShape('SELECT a FROM t WHERE b IN (SELECT c FROM u) UNION SELECT CONCAT(a, b) FROM v'))
+            .toBe('SELECT x FROM x WHERE x IN (SELECT x FROM x) UNION SELECT concat(x, x) FROM x')
+    })
+
+    it('leaves no trace of comments or quoted content', () => {
+        const shape = sqlShape("SELECT * FROM t -- Max Mustermann\nWHERE note = 'IBAN DE89 3704' /* geheim */")
+        expect(shape).not.toMatch(/Max|Mustermann|IBAN|3704|geheim/)
+    })
+
+    it('truncates long statements', () => {
+        const shape = sqlShape(`SELECT ${Array(300).fill('a').join(', ')} FROM t`)
+        expect(shape.length).toBe(501)
+        expect(shape.endsWith('…')).toBe(true)
+    })
+})
+
 describe('SQL tools', () => {
     let server: SeaTableMCPServer
 
@@ -143,6 +169,29 @@ describe('SQL tools', () => {
         await expect(handler({ sql: 'SELECT SUBSTRING(`Name`, 1, 3) FROM `T`' })).rejects.toMatchObject({
             code: 'ERR_BAD_REQUEST',
             message: expect.stringContaining('Hint: use mid(str, pos, len)'),
+        })
+    })
+
+    describe('failure logging', () => {
+        afterEach(() => vi.restoreAllMocks())
+
+        it('logs the reason and a content-free shape, never the statement', async () => {
+            const warn = vi.spyOn(logger, 'warn')
+            await callTool('query_sql', { sql: "SELECT * FROM `Kunden` WHERE `Name` IN (SELECT `Name` FROM `VIP` WHERE `Ort` = 'Mainz')" })
+            const entry = warn.mock.calls.map(c => c[0] as any).find(e => e?.sql_shape)
+            expect(entry).toMatchObject({
+                tool: 'query_sql',
+                reasons: ['subquery'],
+                sql_shape: 'SELECT * FROM `x` WHERE `x` IN (SELECT `x` FROM `x` WHERE `x` = ?)',
+            })
+            expect(JSON.stringify(warn.mock.calls)).not.toMatch(/Kunden|VIP|Mainz/)
+        })
+
+        it('logs the wrong statement type', async () => {
+            const warn = vi.spyOn(logger, 'warn')
+            await callTool('execute_sql', { sql: 'SELECT * FROM `Table1`' })
+            const entry = warn.mock.calls.map(c => c[0] as any).find(e => e?.sql_shape)
+            expect(entry.reasons).toEqual(['wrong_statement_select'])
         })
     })
 })

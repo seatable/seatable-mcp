@@ -1,7 +1,6 @@
 import { z } from 'zod'
 
-import { makeError } from '../../errors.js'
-import { assertSupportedSql, SQL_SYNTAX_RULES, statementKind, withSqlHints } from './sqlCheck.js'
+import { runSql, SQL_SYNTAX_RULES } from './sqlCheck.js'
 import { ToolRegistrar } from './types.js'
 import { cleanSqlMetadata } from './utils.js'
 
@@ -31,11 +30,7 @@ If a query is rejected, find_rows offers client-side filtering as an alternative
         },
         async (args: unknown) => {
             const { sql, parameters } = InputSchema.parse(args)
-            assertSupportedSql(sql)
-            if (statementKind(sql) !== 'select') {
-                throw makeError('ERR_VALIDATION', 'query_sql only runs SELECT statements. Use execute_sql for UPDATE, DELETE or INSERT.')
-            }
-            const result = await withSqlHints(sql, () => client.querySql(sql, parameters))
+            const result = await runSql('query_sql', sql, () => client.querySql(sql, parameters))
             return {
                 content: [{
                     type: 'text',
