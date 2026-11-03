@@ -21,7 +21,6 @@ ${SQL_SYNTAX_RULES}
 SELECT rules:
 - Returns max 100 rows by default. Use LIMIT to get more (up to 10,000).
 - Aliases (AS) can be used in GROUP BY, HAVING, ORDER BY — but NOT in WHERE.
-- ORDER BY columns must appear in the SELECT field list.
 - Joins: FROM \`T1\`, \`T2\` WHERE \`T1\`.\`col\` = \`T2\`.\`col\` (inner joins only).
 
 If a query is rejected, find_rows offers client-side filtering as an alternative.`,
