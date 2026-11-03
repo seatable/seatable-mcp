@@ -26,6 +26,7 @@ import { registerCreateSnapshot } from './tools/createSnapshot.js'
 import { registerDeleteRows } from './tools/deleteRow.js'
 import { registerDownloadFile } from './tools/downloadFile.js'
 import { registerEchoArgs } from './tools/echoArgs.js'
+import { registerExecuteSql } from './tools/executeSql.js'
 import { registerFindRows } from './tools/findRows.js'
 import { registerGetRow } from './tools/getRow.js'
 import { registerGetRowActivities } from './tools/getRowActivities.js'
@@ -108,7 +109,8 @@ export class SeaTableMCPServer {
                     'You are connected to a SeaTable base (always spelled with capital S and T).',
                     'Terminology: use "base" (not database), "table" (not sheet), "row" (not record/entry), "column" (not field), "link" (not relation/relationship).',
                     'Views are not supported. All tools return all columns. Filter and sort client-side using find_rows or query_sql.',
-                    'Prefer query_sql for reading, updating, and deleting data. It supports SELECT, UPDATE...WHERE, and DELETE...WHERE in a single call — much more efficient than fetching row IDs first. SELECT returns max 10,000 rows (vs. list_rows max 1,000 per page).',
+                    'Prefer SQL for reading, updating, and deleting data: query_sql for SELECT, execute_sql for UPDATE...WHERE and DELETE...WHERE. One SQL call is much more efficient than fetching row IDs first. SELECT returns max 10,000 rows (vs. list_rows max 1,000 per page).',
+                    'SeaTable SQL is a restricted dialect: no subqueries, no WITH, no UNION, no JOIN keyword, no window functions. Keep each query simple and answer multi-step questions with several queries, passing values from one result into the next via ? parameters.',
                     '',
                     'SeaTable SQL does NOT use MySQL/MariaDB function names. You MUST use SeaTable function names:',
                     '- SUBSTR/SUBSTRING → mid(str, pos, len)',
@@ -193,6 +195,7 @@ export class SeaTableMCPServer {
         registerUnlinkRows(serverAdapter, deps)
         registerGetSchema(serverAdapter, deps)
         registerQuerySql(serverAdapter, deps)
+        registerExecuteSql(serverAdapter, deps)
         registerListCollaborators(serverAdapter, deps)
         registerUploadFile(serverAdapter, deps)
         registerDownloadFile(serverAdapter, deps)

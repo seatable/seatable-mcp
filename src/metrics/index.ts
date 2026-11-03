@@ -21,6 +21,13 @@ export const toolCallsByToolTotal = new Counter({
     registers: [register],
 })
 
+export const sqlFailuresTotal = new Counter({
+    name: 'mcp_sql_failures_total',
+    help: 'Failed query_sql/execute_sql calls by reason (unsupported construct, wrong statement type, SeaTable error)',
+    labelNames: ['tool', 'reason'] as const,
+    registers: [register],
+})
+
 export const httpRequestsTotal = new Counter({
     name: 'mcp_http_requests_total',
     help: 'Total number of HTTP requests',

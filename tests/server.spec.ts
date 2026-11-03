@@ -69,14 +69,14 @@ describe('SeaTableMCPServer', () => {
         server = buildServer()
     })
 
-    it('buildServer() in mock mode registers all 18 tools', () => {
+    it('buildServer() in mock mode registers all 22 tools', () => {
         const tools = getTools(server)
-        expect(tools.size).toBe(21)
+        expect(tools.size).toBe(22)
     })
 
     it('getToolDefinitions() returns array with name, description, inputSchema', () => {
         const defs = server.getToolDefinitions()
-        expect(defs.length).toBe(21)
+        expect(defs.length).toBe(22)
         for (const def of defs) {
             expect(def).toHaveProperty('name')
             expect(def).toHaveProperty('description')
@@ -87,7 +87,7 @@ describe('SeaTableMCPServer', () => {
 
     it('getStaticToolDefinitions() works without a real client', () => {
         const defs = getStaticToolDefinitions()
-        expect(defs.length).toBe(21)
+        expect(defs.length).toBe(22)
         expect(defs[0]).toHaveProperty('name')
     })
 

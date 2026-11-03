@@ -252,6 +252,7 @@ Available metrics:
 | `mcp_http_requests_total{method, status}` | Counter | HTTP requests by method and status code |
 | `mcp_rate_limit_exceeded_total{type}` | Counter | Rate limit rejections (global/per_ip/per_token) |
 | `mcp_auth_validations_total{result}` | Counter | Auth validations (success/failure/cache_hit) |
+| `mcp_sql_failures_total{tool, reason}` | Counter | Failed `query_sql`/`execute_sql` calls (e.g. `subquery`, `join`, `wrong_statement_update`, `seatable_error`) |
 | `mcp_active_sessions` | Gauge | Currently active HTTP sessions |
 | `mcp_active_connections` | Gauge | Currently active connections |
 | `seatable_api_requests_total{operation, status}` | Counter | SeaTable API calls by operation |
@@ -260,6 +261,62 @@ Available metrics:
 Plus standard Node.js metrics (memory, CPU, event loop) via `prom-client`.
 
 The metrics server only starts in HTTP mode (not stdio) and binds to `0.0.0.0` — in Docker, expose the port only within your internal network.
+
+### SQL failure log
+
+AI models often write MySQL- or PostgreSQL-style SQL that SeaTable does not accept: subqueries, `JOIN`, `UNION`, `CASE WHEN`, `CONCAT()`. To see which patterns fail in practice, every failed `query_sql` or `execute_sql` call writes one log line, without storing any customer data.
+
+**What happens on a call.** `runSql()` in `src/mcp/tools/sqlCheck.ts` runs three stages; each failure is logged and counted:
+
+| Stage | Example | `reasons` |
+|---|---|---|
+| 1. Constructs SeaTable SQL never supports are rejected before the request | `IN (SELECT …)`, `JOIN`, `UNION`, `WITH`, `OVER (…)`, two statements | `subquery`, `join`, `set_operation`, `cte`, `window_function`, `multiple_statements` |
+| 2. Wrong statement type for the tool | `UPDATE` sent to `query_sql`, `SELECT` sent to `execute_sql`, `DROP` | `wrong_statement_<kind>`, e.g. `wrong_statement_update`, `wrong_statement_other` |
+| 3. SeaTable rejects the statement | unknown function, syntax error, unknown column | `seatable_error`, plus `hints` if MySQL function names were used |
+
+In every case the model gets an error message that tells it how to restructure the query, e.g. *"Run the inner SELECT on its own first, then pass its values into the outer query"* or *"use mid(str, pos, len) instead of SUBSTRING"*.
+
+**What is logged.** One `WARN` line with the message `SQL statement failed`:
+
+```json
+{"level":"WARN","tool":"query_sql","reasons":["subquery"],
+ "sql_shape":"SELECT * FROM `x` WHERE `x` IN (SELECT `x` FROM `x` WHERE `x` = ?)",
+ "msg":"SQL statement failed"}
+```
+
+`sql_shape` is the statement with all content removed by `sqlShape()`:
+
+- string literals become `?`, numbers become `0`
+- table and column names (quoted or not) become `x`
+- comments are dropped, whitespace is collapsed, the result is cut at 500 characters
+- only SQL keywords (uppercase), function names (lowercase) and punctuation survive
+
+The original statement and its `parameters` are never logged; a test in `tests/sqlCheck.spec.ts` asserts that table names and values do not appear in the log. Column names are deliberately dropped as well, since names like "Salary" or "Diagnosis" already say something about the customer.
+
+> The general `Tool call failed` line that every tool writes on error is separate and unchanged. For SeaTable errors it contains SeaTable's error message and response body, which may echo column names.
+
+**How to analyse it.** The most frequent failing shapes:
+
+```bash
+docker logs <container> 2>&1 | grep '"SQL statement failed"' \
+  | jq -r '.sql_shape' | sort | uniq -c | sort -rn | head -30
+```
+
+Failures by reason, and the function hints that were given:
+
+```bash
+docker logs <container> 2>&1 | grep '"SQL statement failed"' | jq -r '.reasons[]' | sort | uniq -c | sort -rn
+docker logs <container> 2>&1 | grep '"SQL statement failed"' | jq -r '.hints[]?' | sort | uniq -c | sort -rn
+```
+
+In Prometheus, `mcp_sql_failures_total{tool, reason}` shows the same reasons over time, e.g. `sum by (reason) (increase(mcp_sql_failures_total[7d]))`. Put that next to `mcp_tool_calls_by_tool_total{tool="query_sql"}` to get a failure rate.
+
+**What to do with the results.**
+
+- A shape that keeps failing with `seatable_error` and is a fixed grammar limit → add it to `UNSUPPORTED_CONSTRUCTS` so it is rejected before the request, with a restructuring hint.
+- A MySQL function that keeps appearing → add it to `FUNCTION_HINTS`, and to the function mapping in the server instructions (`src/mcp/server.ts`).
+- Many `wrong_statement_*` → the tool descriptions are not clear enough.
+- Function names only produce hints after a failure, never a rejection, so a function SeaTable adds later cannot be blocked by an outdated list.
 
 ## MCP Tools
 
@@ -276,7 +333,7 @@ The metrics server only starts in HTTP mode (not stdio) and binds to `0.0.0.0` �
 - **`get_row`** — Retrieve specific row by ID
 - **`find_rows`** — Client-side filtering with DSL
 - **`search_rows`** — Search via SQL WHERE clauses
-- **`query_sql`** — Execute SQL queries with parameterized inputs
+- **`query_sql`** — Read-only SELECT queries with parameterized inputs
 
 ### Writing Data
 
@@ -285,6 +342,7 @@ The metrics server only starts in HTTP mode (not stdio) and binds to `0.0.0.0` �
 - **`update_rows`** — Batch update rows
 - **`upsert_rows`** — Insert or update rows by key columns
 - **`delete_rows`** — Remove rows by ID
+- **`execute_sql`** — SQL UPDATE, DELETE or INSERT with parameterized inputs
 
 ### Files
 
