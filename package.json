@@ -1,6 +1,6 @@
 {
   "name": "@seatable/mcp-seatable",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "type": "module",
   "license": "MIT",
   "mcpName": "io.github.seatable/seatable",
@@ -90,6 +90,7 @@
     "tsx": "^4.19.1",
     "typescript": "^5.6.2",
     "typescript-eslint": "^8.5.0",
-    "vitest": "^2.1.1"
+    "vite": "^8.3.5",
+    "vitest": "^5.1.0"
   }
 }
