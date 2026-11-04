@@ -204,6 +204,10 @@ docker run -d --name seatable-mcp \
 
 > If you override the command (e.g. `docker run … seatable/seatable-mcp node dist/index.js --sse`), keep `--permission --allow-fs-read=/app`, otherwise the permission model is off.
 
+### OpenAI Secure MCP Tunnel
+
+To use the server from ChatGPT without exposing it to the internet, run it next to OpenAI's `tunnel-client`. Setup and limitations: [docs/openai-tunnel.md](docs/openai-tunnel.md).
+
 ### Security Model
 
 The security characteristics differ significantly between transport modes:
