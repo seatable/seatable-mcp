@@ -281,7 +281,7 @@ Available metrics:
 | `mcp_http_requests_total{method, status}` | Counter | HTTP requests by method and status code |
 | `mcp_rate_limit_exceeded_total{type}` | Counter | Rate limit rejections (global/per_ip/per_token) |
 | `mcp_auth_validations_total{result}` | Counter | Auth validations (success/failure/cache_hit) |
-| `mcp_sql_failures_total{tool, reason}` | Counter | Failed `query_sql`/`execute_sql` calls (e.g. `subquery`, `join`, `wrong_statement_update`, `seatable_error`) |
+| `mcp_sql_failures_total{tool, reason}` | Counter | Failed `query_sql`/`execute_sql` calls (e.g. `subquery`, `join`, `wrong_statement_update`, `unknown_name`, `seatable_error`) |
 | `mcp_active_sessions` | Gauge | Currently active HTTP sessions |
 | `mcp_active_connections` | Gauge | Currently active connections |
 | `seatable_api_requests_total{operation, status}` | Counter | SeaTable API calls by operation |
@@ -301,7 +301,8 @@ AI models often write MySQL- or PostgreSQL-style SQL that SeaTable does not acce
 |---|---|---|
 | 1. Constructs SeaTable SQL never supports are rejected before the request | `IN (SELECT …)`, `JOIN`, `UNION`, `WITH`, `OVER (…)`, two statements | `subquery`, `join`, `set_operation`, `cte`, `window_function`, `multiple_statements` |
 | 2. Wrong statement type for the tool | `UPDATE` sent to `query_sql`, `SELECT` sent to `execute_sql`, `DROP` | `wrong_statement_<kind>`, e.g. `wrong_statement_update`, `wrong_statement_other` |
-| 3. SeaTable rejects the statement | unknown function, syntax error, unknown column | `seatable_error`, plus `hints` if MySQL function names were used |
+| 3. SeaTable rejects the statement | table or column name that doesn't exist | `unknown_name`, with a hint to call `get_schema` |
+| | unknown function, syntax error | `seatable_error`, plus `hints` if MySQL function names were used |
 
 In every case the model gets an error message that tells it how to restructure the query, e.g. *"Run the inner SELECT on its own first, then pass its values into the outer query"* or *"use mid(str, pos, len) instead of SUBSTRING"*.
 

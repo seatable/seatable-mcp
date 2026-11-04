@@ -205,6 +205,10 @@ function recordFailure(tool: SqlTool, sql: string, reasons: string[], hints: str
     logger.warn({ tool, reasons, sql_shape: sqlShape(sql), ...(hints.length && { hints }) }, 'SQL statement failed')
 }
 
+// In production logs every failed statement was a guessed name, and models
+// repeated the same one because SeaTable only says what is missing.
+const UNKNOWN_NAME_HINT = 'names must match exactly, including case, spaces and umlauts. Call get_schema to see the exact table and column names before retrying'
+
 /**
  * Check a statement for the given tool and run it. Every failure is counted
  * and logged as a content-free shape (see sqlShape), so the patterns models
@@ -228,8 +232,9 @@ export async function runSql<T>(tool: SqlTool, sql: string, run: () => Promise<T
     try {
         return await run()
     } catch (err) {
-        const hints = functionHints(sql)
-        recordFailure(tool, sql, ['seatable_error'], hints)
+        const unknownName = err instanceof Error && /no such (column|table)/i.test(err.message)
+        const hints = unknownName ? [UNKNOWN_NAME_HINT, ...functionHints(sql)] : functionHints(sql)
+        recordFailure(tool, sql, [unknownName ? 'unknown_name' : 'seatable_error'], hints)
         if (hints.length && err instanceof Error) {
             err.message = `${err.message} Hint: ${hints.join('; ')}.`
         }
