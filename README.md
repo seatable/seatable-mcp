@@ -180,6 +180,30 @@ docker run -d --name seatable-mcp \
 curl http://localhost:3000/health
 ```
 
+#### Container hardening
+
+The image is built so that code running inside the server process — for example through a vulnerable dependency — can't change the filesystem, start other programs or escalate privileges:
+
+- **Non-root:** the server runs as `node` (uid 1000). The code in `/app` is owned by root and read-only for that user.
+- **Node permission model:** the default `CMD` starts `node --permission --allow-fs-read=/app`. The process may read its own code and nothing else; writing files, child processes (no shell), worker threads and native addons are denied. Outbound network access is not affected. The server needs none of the denied operations, including `download_file`, which extracts PDF text in memory.
+- **No tools for an attacker:** npm, npx, yarn, corepack and apk are removed, and so are busybox `wget`, `nc` and `su`. The health check uses `node`. There are no setuid binaries.
+- **Pinned base image:** `node:22.23.4-alpine3.24` (build argument `NODE_IMAGE`), with `apk upgrade` at build time.
+
+At runtime, add the restrictions the image can't set itself. `docker-compose.yml` contains all of them:
+
+```bash
+docker run -d --name seatable-mcp \
+  -p 3000:3000 \
+  --read-only --tmpfs /tmp:size=16m,noexec,nosuid,nodev \
+  --cap-drop ALL --security-opt no-new-privileges:true \
+  --pids-limit 128 --memory 512m \
+  -e SEATABLE_SERVER_URL=https://your-seatable-server.com \
+  -e SEATABLE_API_TOKEN=your-api-token \
+  seatable/seatable-mcp:latest
+```
+
+> If you override the command (e.g. `docker run … seatable/seatable-mcp node dist/index.js --sse`), keep `--permission --allow-fs-read=/app`, otherwise the permission model is off.
+
 ### Security Model
 
 The security characteristics differ significantly between transport modes:
@@ -232,6 +256,7 @@ Optional:
 - `SEATABLE_ACCESS_TOKEN_TTL` — lifetime of an issued access token in seconds (default `3600`, range `30`–`2592000`). Lower narrows the window after a SeaTable token is revoked; higher spares users a re-prompt if their client renews badly. The refresh token is never issued shorter-lived than the access token.
 - `SEATABLE_MOCK=true` — Enable mock mode for offline testing
 - `CORS_ALLOWED_ORIGINS` — Comma-separated list of allowed origins for CORS (HTTP mode only, disabled if unset)
+- `OPENAI_APPS_CHALLENGE_TOKEN` — Domain verification token from the OpenAI Apps submission. If set, the server answers `GET /.well-known/openai-apps-challenge` with it (HTTP mode only, endpoint absent if unset)
 - `METRICS_PORT` — Prometheus metrics port (default: `9090`, HTTP mode only)
 
 ## Monitoring
