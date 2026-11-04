@@ -13,12 +13,13 @@ FROM ${NODE_IMAGE}
 # Remove everything the server never uses but an attacker inside the
 # container would: package managers (npm, yarn, corepack, apk) and the
 # busybox network/privilege tools (wget, nc, su). The health check uses
-# node instead of wget.
+# node instead of wget. /lib/apk/db stays: without that list of installed
+# packages, scanners see 0 OS packages and report 0 CVEs however many there are.
 RUN apk upgrade --no-cache \
     && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /opt/yarn-* \
         /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /usr/local/bin/yarn /usr/local/bin/yarnpkg \
         /usr/bin/wget /usr/bin/nc /bin/su \
-        /sbin/apk /etc/apk /lib/apk /usr/share/apk /var/cache/apk
+        /sbin/apk /etc/apk /lib/apk/exec /usr/share/apk /var/cache/apk
 WORKDIR /app
 # Copied as root and left root-owned: the node user can read the code but
 # never change it.
