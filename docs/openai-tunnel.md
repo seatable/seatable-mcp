@@ -53,7 +53,7 @@ CONTROL_PLANE_TUNNEL_ID=tunnel_...
 ```yaml
 services:
   seatable-mcp:
-    image: seatable/seatable-mcp:1.7.1
+    image: seatable/seatable-mcp:1.8.0
     container_name: seatable-mcp
     restart: unless-stopped
     # No "ports:" — the server is reachable only from the Docker network.
