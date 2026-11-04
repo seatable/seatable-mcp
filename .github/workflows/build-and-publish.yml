@@ -208,6 +208,25 @@ jobs:
       - name: Install mcp-publisher
         run: |
           curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_linux_amd64.tar.gz" | tar xz mcp-publisher
+      # The registry checks that the version exists on npm, but npm serves a new
+      # version only after a delay (about two minutes for v1.9.0). Without this
+      # wait the first attempt failed on every release from v1.7.0 to v1.9.0.
+      # Runs before the login so the short-lived OIDC token can't expire.
+      - name: Wait until npm serves the new version
+        env:
+          VERSION: ${{ needs.init-vars.outputs.version }}
+        run: |
+          PACKAGE=$(jq -r .name package.json)
+          URL="https://registry.npmjs.org/${PACKAGE/\//%2F}"
+          for attempt in $(seq 1 40); do
+            if curl -sf "$URL" | jq -e --arg v "$VERSION" '.versions[$v]' > /dev/null; then
+              echo "npm serves ${PACKAGE}@${VERSION} (check ${attempt})"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::npm still doesn't serve ${PACKAGE}@${VERSION} after 10 minutes; re-run this job later."
+          exit 1
       - name: Authenticate to MCP Registry
         run: |
           for attempt in 1 2 3; do
