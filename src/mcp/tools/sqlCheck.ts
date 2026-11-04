@@ -59,6 +59,13 @@ export function statementKind(sql: string): StatementKind {
     return word === 'select' || word === 'update' || word === 'delete' || word === 'insert' ? word : 'other'
 }
 
+/** Rows SeaTable returns for a SELECT without LIMIT. It does not say when it cut. */
+export const DEFAULT_SQL_LIMIT = 100
+
+export function hasLimit(sql: string): boolean {
+    return /\blimit\s+\d/i.test(stripLiterals(sql))
+}
+
 const UNSUPPORTED_CONSTRUCTS: Array<{ reason: string; pattern: RegExp; message: string }> = [
     {
         reason: 'cte',
