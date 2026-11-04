@@ -62,8 +62,29 @@ export function statementKind(sql: string): StatementKind {
 /** Rows SeaTable returns for a SELECT without LIMIT. It does not say when it cut. */
 export const DEFAULT_SQL_LIMIT = 100
 
-export function hasLimit(sql: string): boolean {
-    return /\blimit\s+\d/i.test(stripLiterals(sql))
+const MAX_SQL_LIMIT = 10000
+
+/** The row count a statement asks for; LIMIT n and LIMIT offset, n. */
+export function sqlLimit(sql: string): number | undefined {
+    const match = /\blimit\s+(?:\d+\s*,\s*)?(\d+)/i.exec(stripLiterals(sql))
+    return match ? Number(match[1]) : undefined
+}
+
+/**
+ * A warning when a SELECT may have been cut. Models count, compare or sum such a
+ * result without noticing: SeaTable doesn't report it, and they often pick
+ * LIMIT 100 themselves. A smaller LIMIT is a deliberate top-N, so it stays quiet.
+ */
+export function truncationNotice(sql: string, rowCount: number): string | undefined {
+    const limit = sqlLimit(sql)
+    if (limit === undefined) {
+        if (rowCount !== DEFAULT_SQL_LIMIT) return undefined
+        return `Only the first ${DEFAULT_SQL_LIMIT} rows were returned (SeaTable's default without LIMIT). The result is probably incomplete: repeat the query with LIMIT (up to ${MAX_SQL_LIMIT.toLocaleString('en-US')}) before counting, comparing or summing rows.`
+    }
+    if (limit < DEFAULT_SQL_LIMIT || rowCount !== Math.min(limit, MAX_SQL_LIMIT)) return undefined
+    return rowCount < MAX_SQL_LIMIT
+        ? `The result has exactly as many rows as LIMIT allows (${rowCount}), so it may be incomplete. Raise LIMIT (up to ${MAX_SQL_LIMIT.toLocaleString('en-US')}) before counting, comparing or summing rows.`
+        : `The result reached the maximum of ${MAX_SQL_LIMIT.toLocaleString('en-US')} rows per query, so it may be incomplete. Read further with OFFSET, or let SQL do the work with COUNT, SUM and GROUP BY.`
 }
 
 const UNSUPPORTED_CONSTRUCTS: Array<{ reason: string; pattern: RegExp; message: string }> = [
@@ -205,9 +226,20 @@ function recordFailure(tool: SqlTool, sql: string, reasons: string[], hints: str
     logger.warn({ tool, reasons, sql_shape: sqlShape(sql), ...(hints.length && { hints }) }, 'SQL statement failed')
 }
 
-// In production logs every failed statement was a guessed name, and models
-// repeated the same one because SeaTable only says what is missing.
-const UNKNOWN_NAME_HINT = 'names must match exactly, including case, spaces and umlauts. Call get_schema to see the exact table and column names before retrying'
+// SeaTable's messages say what failed, not how to fix it. In production logs every
+// failed statement was a guessed name, and models repeated the same one.
+const ERROR_HINTS: Array<{ pattern: RegExp; reason: string; hint: string }> = [
+    {
+        pattern: /no such (column|table)/i,
+        reason: 'unknown_name',
+        hint: 'names must match exactly, including case, spaces and umlauts. Call get_schema to see the exact table and column names before retrying',
+    },
+    {
+        pattern: /failed to convert value|type mismatch/i,
+        reason: 'invalid_value',
+        hint: 'a value does not fit its column type. Select columns accept only existing options, spelled exactly (get_schema lists them); dates need the format YYYY-MM-DD',
+    },
+]
 
 /**
  * Check a statement for the given tool and run it. Every failure is counted
@@ -232,9 +264,9 @@ export async function runSql<T>(tool: SqlTool, sql: string, run: () => Promise<T
     try {
         return await run()
     } catch (err) {
-        const unknownName = err instanceof Error && /no such (column|table)/i.test(err.message)
-        const hints = unknownName ? [UNKNOWN_NAME_HINT, ...functionHints(sql)] : functionHints(sql)
-        recordFailure(tool, sql, [unknownName ? 'unknown_name' : 'seatable_error'], hints)
+        const known = err instanceof Error ? ERROR_HINTS.find(h => h.pattern.test(err.message)) : undefined
+        const hints = known ? [known.hint, ...functionHints(sql)] : functionHints(sql)
+        recordFailure(tool, sql, [known ? known.reason : 'seatable_error'], hints)
         if (hints.length && err instanceof Error) {
             err.message = `${err.message} Hint: ${hints.join('; ')}.`
         }

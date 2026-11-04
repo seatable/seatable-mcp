@@ -4,8 +4,9 @@ import { makeError } from '../src/errors'
 import { logger } from '../src/logger'
 import { buildServer, SeaTableMCPServer } from '../src/mcp/server'
 import { registerQuerySql } from '../src/mcp/tools/querySql'
+import { registerExecuteSql } from '../src/mcp/tools/executeSql'
 import { registerListRows } from '../src/mcp/tools/listRows'
-import { assertSupportedSql, functionHints, hasLimit, sqlShape, statementKind, stripLiterals } from '../src/mcp/tools/sqlCheck'
+import { assertSupportedSql, functionHints, sqlLimit, sqlShape, statementKind, stripLiterals, truncationNotice } from '../src/mcp/tools/sqlCheck'
 
 describe('stripLiterals', () => {
     it('neutralises strings, quoted identifiers and comments', () => {
@@ -179,6 +180,26 @@ describe('SQL tools', () => {
         vi.restoreAllMocks()
     })
 
+    it.each([
+        'ERR_BAD_REQUEST: failed to convert value: invalid value',
+        'ERR_BAD_REQUEST: column Umsatz type mismatch',
+    ])('explains "%s"', async (message) => {
+        let handler: (args: unknown) => Promise<unknown> = async () => undefined
+        const client = { querySql: async () => { throw makeError('ERR_BAD_REQUEST', message) } }
+        registerExecuteSql(
+            { registerTool: (_name: string, _config: unknown, h: typeof handler) => { handler = h } },
+            { client: client as any, env: {} as any, getInputSchema: (s: unknown) => s },
+        )
+        const warn = vi.spyOn(logger, 'warn')
+        await expect(handler({ sql: "UPDATE `T` SET `S` = 'x'" })).rejects.toMatchObject({
+            code: 'ERR_BAD_REQUEST',
+            message: expect.stringContaining('Hint: a value does not fit its column type'),
+        })
+        const entry = warn.mock.calls.map(c => c[0] as any).find(e => e?.sql_shape)
+        expect(entry.reasons).toEqual(['invalid_value'])
+        vi.restoreAllMocks()
+    })
+
     it('appends function hints when SeaTable rejects a query', async () => {
         let handler: (args: unknown) => Promise<unknown> = async () => undefined
         const client = {
@@ -233,12 +254,33 @@ describe('truncated results', () => {
     const rows = (n: number) => Array.from({ length: n }, (_, i) => ({ Nr: i + 1 }))
     const querySql = (n: number) => registered(registerQuerySql, { querySql: async () => ({ metadata: [], results: rows(n) }) })
 
-    it('detects LIMIT outside literals', () => {
-        expect(hasLimit('SELECT * FROM t LIMIT 1000')).toBe(true)
-        expect(hasLimit('select * from t limit 5;')).toBe(true)
-        expect(hasLimit("SELECT * FROM t WHERE note = 'limit 5'")).toBe(false)
-        expect(hasLimit('SELECT `Limit 5` FROM t')).toBe(false)
-        expect(hasLimit('SELECT * FROM t')).toBe(false)
+    it('reads LIMIT outside literals', () => {
+        expect(sqlLimit('SELECT * FROM t LIMIT 1000')).toBe(1000)
+        expect(sqlLimit('select * from t limit 5;')).toBe(5)
+        expect(sqlLimit('SELECT * FROM t LIMIT 100 OFFSET 200')).toBe(100)
+        expect(sqlLimit('SELECT * FROM t LIMIT 200, 100')).toBe(100)
+        expect(sqlLimit("SELECT * FROM t WHERE note = 'limit 5'")).toBeUndefined()
+        expect(sqlLimit('SELECT `Limit 5` FROM t')).toBeUndefined()
+        expect(sqlLimit('SELECT * FROM t')).toBeUndefined()
+    })
+
+    it('warns when the result fills an explicit LIMIT of 100 or more', () => {
+        expect(truncationNotice('SELECT a FROM t LIMIT 100', 100)).toContain('as many rows as LIMIT allows (100)')
+        expect(truncationNotice('SELECT a FROM t LIMIT 1000', 1000)).toContain('Raise LIMIT')
+        expect(truncationNotice('SELECT a FROM t LIMIT 100 OFFSET 100', 100)).toContain('Raise LIMIT')
+    })
+
+    it('warns at the maximum of 10,000 rows, even with a higher LIMIT', () => {
+        expect(truncationNotice('SELECT a FROM t LIMIT 10000', 10000)).toContain('Read further with OFFSET')
+        expect(truncationNotice('SELECT a FROM t LIMIT 20000', 10000)).toContain('Read further with OFFSET')
+    })
+
+    it('stays quiet for a top-N and for results below the limit', () => {
+        expect(truncationNotice('SELECT a FROM t ORDER BY a LIMIT 3', 3)).toBeUndefined()
+        expect(truncationNotice('SELECT a FROM t LIMIT 99', 99)).toBeUndefined()
+        expect(truncationNotice('SELECT a FROM t LIMIT 100', 8)).toBeUndefined()
+        expect(truncationNotice('SELECT a FROM t LIMIT 1000', 100)).toBeUndefined()
+        expect(truncationNotice('SELECT a FROM t', 99)).toBeUndefined()
     })
 
     it('adds a notice when a SELECT without LIMIT returns exactly 100 rows', async () => {
@@ -249,7 +291,7 @@ describe('truncated results', () => {
     })
 
     it('adds no notice with LIMIT or fewer rows', async () => {
-        expect((await (await querySql(100))({ sql: 'SELECT `Nr` FROM `Viele` LIMIT 100' })).notice).toBeUndefined()
+        expect((await (await querySql(100))({ sql: 'SELECT `Nr` FROM `Viele` LIMIT 1000' })).notice).toBeUndefined()
         expect((await (await querySql(99))({ sql: 'SELECT `Nr` FROM `Viele`' })).notice).toBeUndefined()
     })
 
