@@ -4,7 +4,7 @@ import Bottleneck from 'bottleneck'
 import { z } from 'zod'
 
 import { getEnv } from '../config/env.js'
-import { toCodedAxiosError } from '../errors.js'
+import { type CodedError, makeError, toCodedAxiosError } from '../errors.js'
 import { logger } from '../logger.js'
 import { seatableApiDurationSeconds, seatableApiRequestsTotal } from '../metrics/index.js'
 import { TokenManager } from './tokenManager.js'
@@ -27,6 +27,21 @@ export type ListRowsQuery = z.infer<typeof ListRowsQuerySchema>
 /** Escape backticks in SQL identifiers to prevent injection. */
 export function sanitizeIdentifier(name: string): string {
     return name.replace(/`/g, '``')
+}
+
+/**
+ * Rethrow an error from a multi-step operation with a code. Only HTTP failures
+ * go through toCodedAxiosError; errors that already carry a code (from
+ * makeError or request()) keep their message, which a second conversion would
+ * reduce to a bare ERR_SERVER.
+ */
+function rethrowCoded(err: unknown, op: string): never {
+    if (axios.isAxiosError(err)) {
+        logAxiosError(err, op)
+        throw toCodedAxiosError(err, op)
+    }
+    if ((err as CodedError).code) throw err
+    throw makeError('ERR_SERVER', `${op} failed: ${err instanceof Error ? err.message : String(err)}`)
 }
 
 export class SeaTableClient {
@@ -296,12 +311,12 @@ export class SeaTableClient {
     }> {
         const metadata = await this.getMetadata()
         const tableObj = (metadata.tables ?? []).find((t: any) => t.name === tableName)
-        if (!tableObj) throw new Error(`Table "${tableName}" not found`)
+        if (!tableObj) throw makeError('ERR_SCHEMA_UNKNOWN_TABLE', `Table "${tableName}" not found`)
 
         const colObj = (tableObj.columns ?? []).find((c: any) => c.name === linkColumnName)
-        if (!colObj) throw new Error(`Column "${linkColumnName}" not found in table "${tableName}"`)
+        if (!colObj) throw makeError('ERR_SCHEMA_UNKNOWN_COLUMN', `Column "${linkColumnName}" not found in table "${tableName}"`)
         if (colObj.type !== 'link') {
-            throw new Error(`Column "${linkColumnName}" is type "${colObj.type}", expected "link"`)
+            throw makeError('ERR_VALIDATION', `Column "${linkColumnName}" is type "${colObj.type}", expected "link"`)
         }
 
         const { link_id, table_id, other_table_id } = colObj.data
@@ -410,11 +425,11 @@ export class SeaTableClient {
             // 1. Validate column type via metadata
             const metadata = await this.getMetadata()
             const tableObj = (metadata.tables ?? []).find((t: any) => t.name === table)
-            if (!tableObj) throw new Error(`Table "${table}" not found`)
+            if (!tableObj) throw makeError('ERR_SCHEMA_UNKNOWN_TABLE', `Table "${table}" not found`)
             const colObj = (tableObj.columns ?? []).find((c: any) => c.name === column)
-            if (!colObj) throw new Error(`Column "${column}" not found in table "${table}"`)
+            if (!colObj) throw makeError('ERR_SCHEMA_UNKNOWN_COLUMN', `Column "${column}" not found in table "${table}"`)
             if (colObj.type !== 'image' && colObj.type !== 'file') {
-                throw new Error(`Column "${column}" is type "${colObj.type}", expected "image" or "file"`)
+                throw makeError('ERR_VALIDATION', `Column "${column}" is type "${colObj.type}", expected "image" or "file"`)
             }
             const columnType: 'image' | 'file' = colObj.type
 
@@ -489,8 +504,7 @@ export class SeaTableClient {
                 column_type: columnType,
             }
         } catch (err) {
-            logAxiosError(err, 'uploadFile')
-            throw toCodedAxiosError(err, 'uploadFile')
+            rethrowCoded(err, 'uploadFile')
         }
     }
 
@@ -542,18 +556,18 @@ export class SeaTableClient {
             // 1. Validate column type via metadata
             const metadata = await this.getMetadata()
             const tableObj = (metadata.tables ?? []).find((t: any) => t.name === table)
-            if (!tableObj) throw new Error(`Table "${table}" not found`)
+            if (!tableObj) throw makeError('ERR_SCHEMA_UNKNOWN_TABLE', `Table "${table}" not found`)
             const colObj = (tableObj.columns ?? []).find((c: any) => c.name === column)
-            if (!colObj) throw new Error(`Column "${column}" not found in table "${table}"`)
+            if (!colObj) throw makeError('ERR_SCHEMA_UNKNOWN_COLUMN', `Column "${column}" not found in table "${table}"`)
             if (colObj.type !== 'image' && colObj.type !== 'file') {
-                throw new Error(`Column "${column}" is type "${colObj.type}", expected "image" or "file"`)
+                throw makeError('ERR_VALIDATION', `Column "${column}" is type "${colObj.type}", expected "image" or "file"`)
             }
 
             // 2. Get the file entry from the row
             const row = await this.getRow(table, rowId)
             const columnValue = row[column]
             if (!columnValue || (Array.isArray(columnValue) && columnValue.length === 0)) {
-                throw new Error(`No files found in column "${column}" for row "${rowId}"`)
+                throw makeError('ERR_VALIDATION', `No files found in column "${column}" for row "${rowId}"`)
             }
 
             let filePath: string
@@ -564,7 +578,7 @@ export class SeaTableClient {
                 const urls = columnValue as string[]
                 if (fileName) {
                     const match = urls.find((u: string) => u.includes(fileName))
-                    if (!match) throw new Error(`File "${fileName}" not found in column "${column}"`)
+                    if (!match) throw makeError('ERR_VALIDATION', `File "${fileName}" not found in column "${column}"`)
                     filePath = match
                 } else {
                     filePath = urls[0]
@@ -576,7 +590,7 @@ export class SeaTableClient {
                 let fileObj: { name: string; url: string; size?: number }
                 if (fileName) {
                     const match = files.find((f) => f.name === fileName)
-                    if (!match) throw new Error(`File "${fileName}" not found in column "${column}"`)
+                    if (!match) throw makeError('ERR_VALIDATION', `File "${fileName}" not found in column "${column}"`)
                     fileObj = match
                 } else {
                     fileObj = files[0]
@@ -605,7 +619,7 @@ export class SeaTableClient {
 
             // The download-link API expects a path like "/files/2024-01/report.pdf" or "/images/2024-01/photo.png"
             const pathMatch = assetPath.match(/\/((?:files|images)\/.+)/)
-            if (!pathMatch) throw new Error(`Cannot extract download path from "${assetPath}"`)
+            if (!pathMatch) throw makeError('ERR_VALIDATION', `Cannot extract download path from "${assetPath}"`)
             const downloadPath = `/${pathMatch[1]}`
 
             // 4. Get download link
@@ -678,8 +692,7 @@ export class SeaTableClient {
                 content_type: 'text',
             }
         } catch (err) {
-            logAxiosError(err, 'downloadFile')
-            throw toCodedAxiosError(err, 'downloadFile')
+            rethrowCoded(err, 'downloadFile')
         }
     }
 
