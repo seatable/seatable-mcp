@@ -229,8 +229,9 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
             }
         }
 
-        // Parse body for POST requests
-        const body = req.method === 'POST' ? await parseJsonBody(req) : undefined
+        // The body is read only after authentication, further down: parsing up to
+        // 10 MB of JSON costs far more memory than that, and must not be available
+        // to a caller without a valid credential.
 
         // Extract session ID from header
         const sessionId = req.headers['mcp-session-id'] as string | undefined
@@ -267,6 +268,9 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
                     return
                 }
             }
+
+            // Before the slot is taken, so that a body that doesn't parse can't hold one.
+            const body = await parseJsonBody(req)
 
             // Connection limit (managed mode)
             if (rateLimiter && apiToken) {
@@ -370,10 +374,14 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
                 presentedDigest = digest(apiToken)
             }
 
-            const session = sessions.get(sessionId)
-            if (!session) {
+            const sessionNotFound = () => {
                 logger.debug({ session: sessionFingerprint(sessionId) }, 'Session not found')
                 res.writeHead(404, { 'content-type': 'text/plain' }).end('Session expired. Please reconnect to start a new session.')
+            }
+
+            const session = sessions.get(sessionId)
+            if (!session) {
+                sessionNotFound()
                 return
             }
 
@@ -384,6 +392,14 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
                     res.writeHead(403, { 'content-type': 'text/plain' }).end('Credential does not match this session')
                     return
                 }
+            }
+
+            const body = req.method === 'POST' ? await parseJsonBody(req) : undefined
+
+            // The session can end while a large body is on its way.
+            if (!sessions.has(sessionId)) {
+                sessionNotFound()
+                return
             }
 
             session.used = true
