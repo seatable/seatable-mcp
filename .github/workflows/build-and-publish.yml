@@ -116,16 +116,35 @@ jobs:
             org.opencontainers.image.documentation=https://github.com/seatable/seatable-mcp
             org.opencontainers.image.vendor=SeaTable
 
+      # Trivy is installed straight from its GitHub release, pinned by version
+      # and checksum. trivy-action/setup-trivy download through get.trivy.dev,
+      # which stopped resolving in November 2026 (aquasecurity/trivy#11537) and
+      # failed every release since v1.7.0. To update: change the version and
+      # take the Linux-64bit line from trivy_<version>_checksums.txt.
+      - name: Install Trivy
+        env:
+          TRIVY_VERSION: "0.76.1"
+          TRIVY_SHA256: "c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0"
+        run: |
+          curl -sfL -o trivy.tar.gz \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_SHA256}  trivy.tar.gz" | sha256sum -c -
+          mkdir -p "$HOME/.local/bin"
+          tar -xzf trivy.tar.gz -C "$HOME/.local/bin" trivy
+          rm trivy.tar.gz
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
       - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: "${{ env.IMAGE_NAME }}:commit-${{ steps.get_commit.outputs.short_sha }}"
-          format: "table"
-          exit-code: "1"
-          scanners: "vuln,misconfig"
-          ignore-unfixed: true
-          vuln-type: "os,library"
-          severity: "CRITICAL,HIGH"
+        run: |
+          trivy --version
+          trivy image \
+            --scanners vuln,misconfig \
+            --pkg-types os,library \
+            --ignore-unfixed \
+            --severity CRITICAL,HIGH \
+            --exit-code 1 \
+            --format table \
+            "${{ env.IMAGE_NAME }}:commit-${{ steps.get_commit.outputs.short_sha }}"
 
   # npm publish — only on release tags (trusted publishing via OIDC)
   publish-npm:
