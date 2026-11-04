@@ -333,4 +333,67 @@ describe('OAuthProvider', () => {
             expect((await tokenRes.json()).error_description).toContain('code_verifier')
         })
     })
+
+describe('refresh with a deleted SeaTable token', () => {
+    // Before: the refresh succeeded because the sealed envelope was still valid,
+    // the new access token failed again, and the client looped between 401 and
+    // refresh without ever asking its user to reconnect.
+    let tokenStatus: 'valid' | 'revoked' | 'unknown'
+    let refreshServer: Server
+    let refreshPort: number
+    let refreshProvider: OAuthProvider
+
+    beforeAll(async () => {
+        refreshProvider = new OAuthProvider({
+            secret: SECRET,
+            trustedRedirectHosts: ['client.example'],
+            checkToken: async () => tokenStatus,
+        })
+        refreshServer = createServer(async (req, res) => {
+            const url = new URL(req.url!, 'http://localhost')
+            if (url.pathname === '/token') await refreshProvider.handleToken(req, res)
+            else res.writeHead(404).end()
+        })
+        await new Promise<void>(resolve => refreshServer.listen(0, '127.0.0.1', () => resolve()))
+        refreshPort = (refreshServer.address() as { port: number }).port
+    })
+
+    afterAll(() => {
+        refreshServer.close()
+        refreshProvider.destroy()
+    })
+
+    // A refresh token for this provider, minted the way issueTokens() does.
+    const refreshTokenFor = (apiToken: string, clientId = 'client-1') =>
+        (refreshProvider as any).cipher.seal('refresh', { t: apiToken, c: clientId }, 60_000) as string
+
+    const refresh = (refreshToken: string) =>
+        fetch(`http://127.0.0.1:${refreshPort}/token`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken, client_id: 'client-1' }),
+        })
+
+    it('answers invalid_grant once SeaTable reports the token as revoked', async () => {
+        tokenStatus = 'revoked'
+        const res = await refresh(refreshTokenFor('deleted-token'))
+        expect(res.status).toBe(400)
+        const data = await res.json()
+        expect(data.error).toBe('invalid_grant')
+        expect(data.error_description).toContain('deleted or revoked')
+    })
+
+    it('still refreshes a valid token', async () => {
+        tokenStatus = 'valid'
+        const res = await refresh(refreshTokenFor('live-token'))
+        expect(res.status).toBe(200)
+        expect(refreshProvider.resolveAccessToken((await res.json()).access_token)).toBe('live-token')
+    })
+
+    it('still refreshes when SeaTable cannot be reached', async () => {
+        tokenStatus = 'unknown'
+        const res = await refresh(refreshTokenFor('live-token'))
+        expect(res.status).toBe(200)
+    })
+})
 })

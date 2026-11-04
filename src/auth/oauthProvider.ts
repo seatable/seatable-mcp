@@ -42,6 +42,12 @@ export interface OAuthProviderOptions {
     /** Optional callback to validate an API token before issuing an authorization code. */
     validateToken?: (token: string) => Promise<boolean>
     /**
+     * Optional check on refresh: 'revoked' ends the connection with invalid_grant,
+     * so the client asks its user to sign in again. 'unknown' (SeaTable not
+     * reachable) still refreshes; an outage must not sign everyone out.
+     */
+    checkToken?: (token: string) => Promise<'valid' | 'revoked' | 'unknown'>
+    /**
      * Hostnames whose https callbacks may receive an authorization code.
      * Exact, case-insensitive match — no subdomain wildcards. Loopback and
      * private-use schemes are always allowed and need no entry here.
@@ -122,6 +128,7 @@ export class OAuthProvider {
     private readonly cleanupInterval: ReturnType<typeof setInterval>
     private readonly configuredHostname?: string
     private readonly validateToken?: (token: string) => Promise<boolean>
+    private readonly checkToken?: (token: string) => Promise<'valid' | 'revoked' | 'unknown'>
     private readonly cipher: TokenCipher
     private readonly trustedRedirectHosts: Set<string>
     private readonly getClientIp?: (req: IncomingMessage) => string
@@ -132,6 +139,7 @@ export class OAuthProvider {
     constructor(options?: OAuthProviderOptions) {
         this.configuredHostname = options?.hostname
         this.validateToken = options?.validateToken
+        this.checkToken = options?.checkToken
         this.getClientIp = options?.getClientIp
         this.accessTokenTtlMs = options?.accessTokenTtlMs ?? DEFAULT_ACCESS_TOKEN_TTL_MS
         // A refresh token that outlives its access token is the whole point, so
@@ -515,7 +523,7 @@ export class OAuthProvider {
         const grantType = body.get('grant_type')
 
         if (grantType === 'refresh_token') {
-            this.handleRefreshGrant(body, res)
+            await this.handleRefreshGrant(body, res)
             return
         }
 
@@ -588,7 +596,7 @@ export class OAuthProvider {
         this.codes.clear()
     }
 
-    private handleRefreshGrant(body: Map<string, string>, res: ServerResponse): void {
+    private async handleRefreshGrant(body: Map<string, string>, res: ServerResponse): Promise<void> {
         const refreshToken = body.get('refresh_token') ?? ''
         if (!refreshToken) {
             this.tokenError(res, 'invalid_request', 'Missing refresh_token')
@@ -606,6 +614,16 @@ export class OAuthProvider {
         if (clientId && !constantTimeEquals(clientId, payload.c)) {
             logger.warn('OAuth refresh rejected: client_id does not match the refresh token')
             this.tokenError(res, 'invalid_grant', 'client_id does not match the refresh token')
+            return
+        }
+
+        // A deleted SeaTable token used to refresh fine -- the envelope is still
+        // valid -- and every new access token failed again, so clients looped
+        // between 401 and refresh without ever asking the user to reconnect.
+        // invalid_grant is the RFC 6749 signal that sends them back to sign-in.
+        if (this.checkToken && (await this.checkToken(payload.t)) === 'revoked') {
+            logger.warn({ clientId: fingerprint(payload.c) }, 'OAuth refresh rejected: SeaTable API token no longer valid')
+            this.tokenError(res, 'invalid_grant', 'The SeaTable API token behind this connection was deleted or revoked. Connect again with a current API token.')
             return
         }
 
