@@ -91,6 +91,27 @@ describe('SeaTableMCPServer', () => {
         expect(defs[0]).toHaveProperty('name')
     })
 
+    // Directory reviewers call the tools and compare against these hints. Any
+    // tool that can overwrite or remove existing data must be destructive;
+    // a new tool fails here until it is placed in one of the lists.
+    it('annotates every tool with the hint matching its behaviour', () => {
+        const readOnly = [
+            'list_tables', 'list_rows', 'get_row', 'find_rows', 'search_rows', 'get_schema', 'query_sql',
+            'list_collaborators', 'download_file', 'get_row_activities', 'ping_seatable',
+        ]
+        const additive = ['add_row', 'append_rows', 'link_rows', 'add_select_options', 'create_snapshot']
+        const destructive = ['update_rows', 'delete_rows', 'unlink_rows', 'upsert_rows', 'upload_file', 'execute_sql']
+
+        const defs = server.getToolDefinitions()
+        expect(defs.map(d => d.name).sort()).toEqual([...readOnly, ...additive, ...destructive].sort())
+        for (const def of defs) {
+            const expected = readOnly.includes(def.name)
+                ? { readOnlyHint: true, destructiveHint: false }
+                : { readOnlyHint: false, destructiveHint: destructive.includes(def.name) }
+            expect({ name: def.name, ...def.annotations }).toMatchObject({ name: def.name, ...expected })
+        }
+    })
+
     it('handleCallTool with valid tool returns result', async () => {
         const result = await callTool(server, 'list_tables', {})
         expect(result).toHaveProperty('content')
