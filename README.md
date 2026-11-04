@@ -186,7 +186,7 @@ The image is built so that code running inside the server process — for exampl
 
 - **Non-root:** the server runs as `node` (uid 1000). The code in `/app` is owned by root and read-only for that user.
 - **Node permission model:** the default `CMD` starts `node --permission --allow-fs-read=/app`. The process may read its own code and nothing else; writing files, child processes (no shell), worker threads and native addons are denied. Outbound network access is not affected. The server needs none of the denied operations, including `download_file`, which extracts PDF text in memory.
-- **No tools for an attacker:** npm, npx, yarn, corepack and apk are removed, and so are busybox `wget`, `nc` and `su`. The health check uses `node`. There are no setuid binaries.
+- **No tools for an attacker:** npm, npx, yarn, corepack and apk are removed, and so are busybox `wget`, `nc` and `su`. The health check uses `node`. There are no setuid binaries. Only apk's package list in `/lib/apk/db` stays, so that vulnerability scanners can see the OS packages. Without `/sbin/apk` it can't install anything, and the permission model denies the server read access to it.
 - **Pinned base image:** `node:22.23.4-alpine3.24` (build argument `NODE_IMAGE`), with `apk upgrade` at build time.
 
 At runtime, add the restrictions the image can't set itself. `docker-compose.yml` contains all of them:
