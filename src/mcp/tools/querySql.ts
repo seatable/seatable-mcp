@@ -6,7 +6,7 @@ import { cleanSqlMetadata } from './utils.js'
 
 const InputSchema = z.object({
     sql: z.string().describe('SELECT statement').refine(sql => sql.trim().length > 0, 'SQL query cannot be empty'),
-    parameters: z.array(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional().describe('Values for ? placeholders in the SQL query'),
+    parameters: z.array(z.union([z.string(), z.number(), z.boolean(), z.null()])).max(1000).optional().describe('Values for ? placeholders in the SQL query'),
 })
 
 export const registerQuerySql: ToolRegistrar = (server, { client, getInputSchema }) => {

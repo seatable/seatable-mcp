@@ -4,7 +4,7 @@ import { ToolRegistrar } from './types.js'
 
 const InputSchema = z.object({
     table: z.string().describe('Target table name'),
-    query: z.record(z.any()).describe('Filter object with column name -> value pairs'),
+    query: z.record(z.string(), z.any()).describe('Filter object with column name -> value pairs'),
 })
 
 export const registerSearchRows: ToolRegistrar = (server, { client, getInputSchema }) => {

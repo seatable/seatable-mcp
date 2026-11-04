@@ -6,7 +6,7 @@ import { ToolRegistrar } from './types.js'
 
 const UpdateItem = z.object({
     row_id: z.string().describe('Row ID (_id field) to update'),
-    values: z.record(z.any()).describe('Column name -> new value pairs'),
+    values: z.record(z.string(), z.any()).describe('Column name -> new value pairs'),
 })
 
 const InputSchema = z.object({

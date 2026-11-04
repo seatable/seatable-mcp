@@ -10,7 +10,7 @@ const InputSchema = z.object({
     name: z.string().describe('Option label'),
     color: z.string().optional().describe('Background color (hex, e.g. "#FF8000")'),
     textColor: z.string().optional().describe('Text color (hex, e.g. "#FFFFFF")'),
-  })).min(1).describe('Array of options to add'),
+  })).min(1).max(1000).describe('Array of options to add'),
 })
 
 /** Names of the options a select column already has. Empty if the column has none yet. */

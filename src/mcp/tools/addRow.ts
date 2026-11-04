@@ -6,7 +6,7 @@ import { ToolRegistrar } from './types.js'
 
 const InputSchema = z.object({
     table: z.string().describe('Target table name'),
-    row: z.record(z.any()).describe('Row object (column -> value)'),
+    row: z.record(z.string(), z.any()).describe('Row object (column -> value)'),
 })
 
 export const registerAddRow: ToolRegistrar = (server, { client, getInputSchema }) => {

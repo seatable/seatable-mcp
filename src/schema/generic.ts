@@ -34,7 +34,7 @@ export const GenericColumnSchema = z.object({
     id: z.string(),
     name: z.string(),
     type: GenericColumnType,
-    options: z.record(z.unknown()).optional(),
+    options: z.record(z.string(), z.unknown()).optional(),
 })
 export type GenericColumn = z.infer<typeof GenericColumnSchema>
 
