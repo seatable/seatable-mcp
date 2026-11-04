@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { runSql, SQL_SYNTAX_RULES } from './sqlCheck.js'
+import { DEFAULT_SQL_LIMIT, hasLimit, runSql, SQL_SYNTAX_RULES } from './sqlCheck.js'
 import { ToolRegistrar } from './types.js'
 import { cleanSqlMetadata } from './utils.js'
 
@@ -19,9 +19,10 @@ export const registerQuerySql: ToolRegistrar = (server, { client, getInputSchema
 ${SQL_SYNTAX_RULES}
 
 SELECT rules:
-- Returns max 100 rows by default. Use LIMIT to get more (up to 10,000).
+- Returns only 100 rows unless you add LIMIT. Add LIMIT (up to 10,000) whenever you need all rows, e.g. to count, compare or sum them yourself.
 - Aliases (AS) can be used in GROUP BY, HAVING, ORDER BY — but NOT in WHERE.
 - Joins: FROM \`T1\`, \`T2\` WHERE \`T1\`.\`col\` = \`T2\`.\`col\` (inner joins only).
+- Link columns can't be a join condition: comparing them with another column never matches. Instead GROUP BY the link column (one row per linked row, shown by its display value), filter with \`Link\` = 'display value', or use the link column on the other table (SeaTable creates one on both sides), e.g. WHERE \`Orders\` IS NULL for rows without linked rows.
 
 If a query is rejected, find_rows offers client-side filtering as an alternative.`,
             inputSchema: getInputSchema(InputSchema),
@@ -30,10 +31,16 @@ If a query is rejected, find_rows offers client-side filtering as an alternative
         async (args: unknown) => {
             const { sql, parameters } = InputSchema.parse(args)
             const result = await runSql('query_sql', sql, () => client.querySql(sql, parameters))
+            // SeaTable cuts a SELECT without LIMIT at 100 rows and doesn't say so.
+            // Models then count, compare or sum an incomplete result without noticing.
+            const truncated = !hasLimit(sql) && result.results.length === DEFAULT_SQL_LIMIT
             return {
                 content: [{
                     type: 'text',
                     text: JSON.stringify({
+                        ...(truncated && {
+                            notice: `Only the first ${DEFAULT_SQL_LIMIT} rows were returned (SeaTable's default without LIMIT). The result is probably incomplete: repeat the query with LIMIT (up to 10,000) before counting, comparing or summing rows.`,
+                        }),
                         metadata: cleanSqlMetadata(result.metadata),
                         results: result.results,
                     }),

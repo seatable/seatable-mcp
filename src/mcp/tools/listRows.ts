@@ -20,7 +20,10 @@ export const registerListRows: ToolRegistrar = (server, { client, getInputSchema
         async (args: unknown) => {
             const parsed = InputSchema.parse(args)
             const res = await client.listRows(parsed)
-            return { content: [{ type: 'text', text: JSON.stringify(res) }] }
+            const notice = res.has_more
+                ? `More rows exist. Request page ${parsed.page + 1}, or use query_sql with LIMIT (up to 10,000) to read them in one call, before counting, comparing or summing rows.`
+                : undefined
+            return { content: [{ type: 'text', text: JSON.stringify({ ...(notice && { notice }), ...res }) }] }
         }
     )
 }

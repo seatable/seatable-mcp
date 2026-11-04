@@ -4,7 +4,8 @@ import { makeError } from '../src/errors'
 import { logger } from '../src/logger'
 import { buildServer, SeaTableMCPServer } from '../src/mcp/server'
 import { registerQuerySql } from '../src/mcp/tools/querySql'
-import { assertSupportedSql, functionHints, sqlShape, statementKind, stripLiterals } from '../src/mcp/tools/sqlCheck'
+import { registerListRows } from '../src/mcp/tools/listRows'
+import { assertSupportedSql, functionHints, hasLimit, sqlShape, statementKind, stripLiterals } from '../src/mcp/tools/sqlCheck'
 
 describe('stripLiterals', () => {
     it('neutralises strings, quoted identifiers and comments', () => {
@@ -193,5 +194,51 @@ describe('SQL tools', () => {
             const entry = warn.mock.calls.map(c => c[0] as any).find(e => e?.sql_shape)
             expect(entry.reasons).toEqual(['wrong_statement_select'])
         })
+    })
+})
+
+// SeaTable cuts a SELECT without LIMIT at 100 rows and doesn't say so. In the
+// plugin test a model compared two such lists to find customers without
+// orders; with more than 100 orders the answer would have been silently wrong.
+describe('truncated results', () => {
+    function registered(register: typeof registerQuerySql, client: Record<string, unknown>) {
+        let handler: (args: unknown) => Promise<any> = async () => undefined
+        register(
+            { registerTool: (_name: string, _config: unknown, h: typeof handler) => { handler = h } },
+            { client: client as any, env: {} as any, getInputSchema: (s: unknown) => s },
+        )
+        return async (args: unknown) => JSON.parse((await handler(args)).content[0].text)
+    }
+    const rows = (n: number) => Array.from({ length: n }, (_, i) => ({ Nr: i + 1 }))
+    const querySql = (n: number) => registered(registerQuerySql, { querySql: async () => ({ metadata: [], results: rows(n) }) })
+
+    it('detects LIMIT outside literals', () => {
+        expect(hasLimit('SELECT * FROM t LIMIT 1000')).toBe(true)
+        expect(hasLimit('select * from t limit 5;')).toBe(true)
+        expect(hasLimit("SELECT * FROM t WHERE note = 'limit 5'")).toBe(false)
+        expect(hasLimit('SELECT `Limit 5` FROM t')).toBe(false)
+        expect(hasLimit('SELECT * FROM t')).toBe(false)
+    })
+
+    it('adds a notice when a SELECT without LIMIT returns exactly 100 rows', async () => {
+        const data = await (await querySql(100))({ sql: 'SELECT `Nr` FROM `Viele`' })
+        expect(data.notice).toContain('repeat the query with LIMIT')
+        expect(Object.keys(data)[0]).toBe('notice')
+        expect(data.results).toHaveLength(100)
+    })
+
+    it('adds no notice with LIMIT or fewer rows', async () => {
+        expect((await (await querySql(100))({ sql: 'SELECT `Nr` FROM `Viele` LIMIT 100' })).notice).toBeUndefined()
+        expect((await (await querySql(99))({ sql: 'SELECT `Nr` FROM `Viele`' })).notice).toBeUndefined()
+    })
+
+    it('list_rows adds a notice when more pages exist', async () => {
+        const listRows = (hasMore: boolean) => registered(registerListRows, {
+            listRows: async () => ({ rows: rows(100), page: 1, page_size: 100, has_more: hasMore }),
+        })
+        const more = await (await listRows(true))({ table: 'Viele' })
+        expect(more.notice).toContain('Request page 2')
+        expect(more.has_more).toBe(true)
+        expect((await (await listRows(false))({ table: 'Viele' })).notice).toBeUndefined()
     })
 })
