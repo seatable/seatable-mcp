@@ -48,7 +48,7 @@ Copy `.env.example` to `.env` for local development.
 ### Modes
 
 - **Selfhosted** (default): Single API token from env, one client per process. Supports multi-base via `SEATABLE_BASES`.
-- **Managed** (`SEATABLE_MODE=managed`): HTTP-only, each client authenticates with their own Bearer token **on every request** — the `mcp-session-id` header is a routing value, never a credential, and a request must resolve to the identity that created the session. Token validated against SeaTable (`src/auth/tokenValidator.ts`) with positive (1 min) / negative (1 min) cache. Rate limiting via `src/ratelimit/` (per-token, per-IP, global, concurrent connections).
+- **Managed** (`SEATABLE_MODE=managed`): HTTP-only, each client authenticates with their own Bearer token **on every request** — the `mcp-session-id` header is a routing value, never a credential, and a request must resolve to the identity that created the session. The request body is read only after that check (`tests/authBeforeBody.spec.ts`), because parsing it costs far more memory than its size. Token validated against SeaTable (`src/auth/tokenValidator.ts`) with positive (1 min) / negative (1 min) cache. Rate limiting via `src/ratelimit/` (per-token, per-IP, global, concurrent connections).
 
 ### Connection slots and session lifetime
 
