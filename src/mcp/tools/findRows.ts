@@ -41,7 +41,7 @@ export type Where = z.infer<typeof Where>
 // Use a loose schema for boundary parsing
 const InputSchema = z.object({
   table: z.string().describe('Target table name'),
-  where: z.unknown().describe('Filter predicate (e.g. {"eq":{"field":"Name","value":"foo"}} or shorthand {"Name":"foo"})'),
+  where: z.unknown().optional().describe('Filter predicate (e.g. {"eq":{"field":"Name","value":"foo"}} or shorthand {"Name":"foo"})'),
   page: z.number().int().min(1).optional().default(1).describe('Page number (1-based)'),
   page_size: z.number().int().min(1).max(1000).optional().default(100).describe('Rows per page (max 1000)'),
   order_by: z.string().optional().describe('Column name to sort by'),

@@ -9,7 +9,6 @@ import {
     type ListToolsResult,
 } from '@modelcontextprotocol/sdk/types.js'
 import { z } from 'zod'
-import { zodToJsonSchema } from 'zod-to-json-schema'
 
 import { getEnv, parseBases, VERSION } from '../config/env.js'
 import type { CodedError } from '../errors.js'
@@ -48,10 +47,8 @@ import { registerUpsertRows } from './tools/upsertRows.js'
 
 // Helper function to convert Zod schemas to JSON Schema for MCP tools
 const getInputSchema = (schema: z.ZodType<object>): ListToolsResult['tools'][0]['inputSchema'] => {
-    const jsonSchema = zodToJsonSchema(schema, {
-        target: 'jsonSchema7',
-        strictUnions: true
-    })
+    // io: 'input' describes what callers send, so fields with a default stay optional.
+    const jsonSchema = z.toJSONSchema(schema, { target: 'draft-7', io: 'input' }) as Record<string, unknown>
 
     if (!('type' in jsonSchema) || jsonSchema.type !== 'object') {
         throw new Error(`Invalid input schema: expected an object but got ${

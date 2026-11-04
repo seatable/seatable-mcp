@@ -7,7 +7,7 @@ import { ToolRegistrar } from './types.js'
 
 const InputSchema = z.object({
     table: z.string().describe('Target table name'),
-    key_columns: z.array(z.string()).min(1).describe('Columns to match on for finding existing rows'),
+    key_columns: z.array(z.string()).min(1).max(100).describe('Columns to match on for finding existing rows'),
     rows: z.array(z.record(z.string(), z.any())).min(1).max(100).describe('Array of row objects (column name -> value)'),
 })
 

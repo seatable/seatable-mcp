@@ -7,7 +7,7 @@ const ColumnSchema = z.object({
     key: z.string(),
     name: z.string(),
     type: z.string(),
-    data: z.record(z.unknown()).nullable().optional(),
+    data: z.record(z.string(), z.unknown()).nullable().optional(),
     description: z.string().nullable().optional(),
 })
 const TableSchema = z

@@ -62,9 +62,7 @@ const EnvSchema = z
         TRUST_PROXY: z
             .string()
             .optional()
-            .transform((v) => v !== '0' && v !== 'false')
-            .optional()
-            .default('true'),
+            .transform((v) => v !== '0' && v !== 'false'),
     })
     .superRefine((data, ctx) => {
         if (data.SEATABLE_MODE === 'managed' && !data.SEATABLE_TOKEN_SECRET) {
