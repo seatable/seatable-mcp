@@ -34,10 +34,22 @@ services:
       - SEATABLE_BASES
       - SEATABLE_MODE=managed
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
+    # The server writes no files and needs no privileges. Together with the
+    # Node permission model in the image's CMD, code running in the process
+    # can neither change the filesystem nor gain capabilities.
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid,nodev
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 512m
     networks:
       - frontend-net
     restart: unless-stopped
