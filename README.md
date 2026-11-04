@@ -486,6 +486,8 @@ node scripts/mcp-call.cjs list_tables '{}'
 node scripts/mcp-call.cjs list_rows '{"table": "Tasks", "page_size": 5}'
 ```
 
+To check how real models use the SQL tools, see [Testing the SQL tools with a model](docs/testing-with-models.md).
+
 ## Troubleshooting
 
 | Issue | Solution |

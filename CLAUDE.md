@@ -100,10 +100,43 @@ That guard exists because the opposite behaviour hid a bug for five months (fixe
 
 Every failure is logged as `SQL statement failed` with `reasons` and `sql_shape` and counted in `mcp_sql_failures_total`. `sqlShape()` removes all customer content — literals become `?`/`0`, table and column names become `x` — so the log shows which constructs models get wrong without storing data. Never log the raw statement or its parameters. How to read and act on the log: README, "SQL failure log".
 
+`runSql()` also adds hints to SeaTable's errors, in `ERROR_HINTS`: `no such column/table` points to `get_schema` (reason `unknown_name`), `failed to convert value` and `type mismatch` explain select options and the date format (reason `invalid_value`). In production the failures were guessed names, not dialect problems, and models repeated them.
+
+`truncationNotice()` adds a `notice` field to `query_sql` results that may be cut, and `list_rows` does the same when `has_more` is set. A `LIMIT` below 100 is treated as a deliberate top-N and stays quiet.
+
+SeaTable SQL behaviour verified against 7.0, which the tool texts rely on:
+
+- A `SELECT` without `LIMIT` returns 100 rows, also with `GROUP BY`, and does not say it cut. `LIMIT` goes up to 10,000 and `OFFSET` works (`LIMIT n OFFSET m` and `LIMIT m, n`).
+- A link column can't be a join condition: `= other.col` and `= other._id` return nothing, `HAS ANY OF (other.col)` is an error. `GROUP BY` on it works, `` `Link` = 'display value' `` filters, and the link column on the other table supports `IS NULL`.
+- `ORDER BY` accepts columns outside the `SELECT` list.
+- A deleted API token answers 403 on a self-hosted 7.0 and 404 on SeaTable Cloud. `TokenValidator.check()` treats both, and 401, as revoked.
+
+To see how real models use the tools, run the series in `docs/testing-with-models.md`.
+
+### Server instructions and tool annotations
+
+The `instructions` in `src/mcp/server.ts` reach every client, and the SeaTable AI chat plugin (`seatable-plugin-ai-chat`) embeds them in its system prompt instead of keeping its own SQL rules. A change there takes effect for all clients on the next deployment, without a plugin release. If a rule moves here from a client, deploy the server first.
+
+`tests/server.spec.ts` pins every tool as read-only, additive or destructive. A tool that can overwrite or remove existing data must be destructive; directory reviewers call the tools and compare against the hints.
+
+### Container
+
+The image's `CMD` runs `node --permission --allow-fs-read=/app`. Writing files, reading outside `/app`, child processes, worker threads and native addons fail with `ERR_ACCESS_DENIED`, so a new feature that needs one of these has to change the flags deliberately. The image has no `wget`, `nc`, npm or apk; health checks use `node`. See README, "Container hardening".
+
 ### Schema Utilities
 
 - `src/schema/map.ts` — converts SeaTable metadata to `GenericSchema` format
 - `src/schema/validate.ts` — validates row data against schema before writes
+
+## Releases
+
+The workflow runs on tags. `testing-vX.Y.Z` only builds the image `testing-X.Y.Z`. `release-vX.Y.Z` also publishes `:latest`, npm (irreversible) and the MCP Registry.
+
+1. Bump the version in the PR (`npm version X.Y.Z --no-git-tag-version`). The npm job fails if the tag and `package.json` differ.
+2. After the merge, build the image and scan it locally with the workflow's Trivy parameters. The workflow pushes the image **before** it scans, so a red scan has already published.
+3. Set an annotated tag `release-vX.Y.Z` on `main`. Its message is the changelog: name breaking changes and what deployments with their own compose file have to do.
+
+The commit messages of this public repo should not contain table or column names from customer logs.
 
 ## Known Limitations
 
