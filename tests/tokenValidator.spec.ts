@@ -96,4 +96,23 @@ describe('TokenValidator', () => {
             validator.destroy()
         }
     })
+
+    // check() decides whether an OAuth refresh may continue: only a definite
+    // rejection by SeaTable counts as revoked, an outage must not.
+    it.each([
+        [{ response: { status: 404 } }, 'revoked'],
+        [{ response: { status: 401 } }, 'revoked'],
+        [{ response: { status: 403 } }, 'revoked'],
+        [{ response: { status: 502 } }, 'unknown'],
+        [{ code: 'ECONNREFUSED' }, 'unknown'],
+    ])('check() maps %o to %s', async (error, expected) => {
+        vi.spyOn(axios, 'get').mockRejectedValue(error)
+        const validator = new TokenValidator(serverUrl)
+        try {
+            expect(await validator.check('some-token')).toBe(expected)
+            expect(await validator.validate('some-token')).toBe(false)
+        } finally {
+            validator.destroy()
+        }
+    })
 })

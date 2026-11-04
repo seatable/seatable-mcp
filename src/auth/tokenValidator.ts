@@ -3,8 +3,15 @@ import axios from 'axios'
 import { logger } from '../logger.js'
 import { authValidationsTotal } from '../metrics/index.js'
 
+/**
+ * valid: SeaTable accepted the token. revoked: SeaTable answered 401/403/404,
+ * the token is gone for good. unknown: no answer (network error, timeout, 5xx),
+ * which says nothing about the token itself.
+ */
+export type TokenStatus = 'valid' | 'revoked' | 'unknown'
+
 interface CacheEntry {
-    valid: boolean
+    status: TokenStatus
     expiresAt: number
 }
 
@@ -28,11 +35,15 @@ export class TokenValidator {
     }
 
     async validate(apiToken: string): Promise<boolean> {
+        return (await this.check(apiToken)) === 'valid'
+    }
+
+    async check(apiToken: string): Promise<TokenStatus> {
         const cached = this.cache.get(apiToken)
         if (cached && Date.now() < cached.expiresAt) {
-            logger.debug({ cached: cached.valid }, 'Token validation cache hit')
+            logger.debug({ cached: cached.status }, 'Token validation cache hit')
             authValidationsTotal.inc({ result: 'cache_hit' })
-            return cached.valid
+            return cached.status
         }
 
         try {
@@ -41,16 +52,17 @@ export class TokenValidator {
                 headers: { Authorization: `Bearer ${apiToken}` },
                 timeout: 10_000,
             })
-            const valid = !!res.data?.access_token
-            this.cache.set(apiToken, { valid, expiresAt: Date.now() + POSITIVE_TTL_MS })
+            const status: TokenStatus = res.data?.access_token ? 'valid' : 'unknown'
+            this.cache.set(apiToken, { status, expiresAt: Date.now() + POSITIVE_TTL_MS })
             authValidationsTotal.inc({ result: 'success' })
-            return valid
+            return status
         } catch (err: any) {
-            const status = err?.response?.status
-            logger.warn({ status }, 'Token validation failed')
-            this.cache.set(apiToken, { valid: false, expiresAt: Date.now() + NEGATIVE_TTL_MS })
+            const httpStatus = err?.response?.status
+            logger.warn({ status: httpStatus }, 'Token validation failed')
+            const status: TokenStatus = httpStatus === 401 || httpStatus === 403 || httpStatus === 404 ? 'revoked' : 'unknown'
+            this.cache.set(apiToken, { status, expiresAt: Date.now() + NEGATIVE_TTL_MS })
             authValidationsTotal.inc({ result: 'failure' })
-            return false
+            return status
         }
     }
 
