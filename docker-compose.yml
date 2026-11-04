@@ -1,7 +1,7 @@
 services:
   caddy:
     container_name: caddy
-    image: lucaslorentz/caddy-docker-proxy:2.10.0-alpine
+    image: lucaslorentz/caddy-docker-proxy:2.13.1-alpine
     ports:
       - "80:80"
       - "443:443"
