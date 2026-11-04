@@ -158,6 +158,27 @@ describe('SQL tools', () => {
         expect(errorText(result)).toContain('Subqueries are not supported')
     })
 
+    it.each([
+        'ERR_BAD_REQUEST: no such column: Runde-ID',
+        'ERR_BAD_REQUEST: no such table: Eigentuemer',
+    ])('points to get_schema on "%s"', async (message) => {
+        let handler: (args: unknown) => Promise<unknown> = async () => undefined
+        const client = { querySql: async () => { throw makeError('ERR_BAD_REQUEST', message) } }
+        registerQuerySql(
+            { registerTool: (_name: string, _config: unknown, h: typeof handler) => { handler = h } },
+            { client: client as any, env: {} as any, getInputSchema: (s: unknown) => s },
+        )
+        const warn = vi.spyOn(logger, 'warn')
+        await expect(handler({ sql: 'SELECT `Runde-ID` FROM `T`' })).rejects.toMatchObject({
+            code: 'ERR_BAD_REQUEST',
+            message: expect.stringMatching(/^ERR_BAD_REQUEST: no such .* Hint: names must match exactly.*get_schema/),
+        })
+        const entry = warn.mock.calls.map(c => c[0] as any).find(e => e?.sql_shape)
+        expect(entry.reasons).toEqual(['unknown_name'])
+        expect(entry.sql_shape).toBe('SELECT `x` FROM `x`')
+        vi.restoreAllMocks()
+    })
+
     it('appends function hints when SeaTable rejects a query', async () => {
         let handler: (args: unknown) => Promise<unknown> = async () => undefined
         const client = {
