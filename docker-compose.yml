@@ -33,6 +33,10 @@ services:
       - SEATABLE_API_TOKEN
       - SEATABLE_BASES
       - SEATABLE_MODE=managed
+      # Required in managed mode: seals the OAuth tokens the server issues.
+      # Generate once (openssl rand -hex 32) and keep it stable; changing it
+      # signs every client out.
+      - SEATABLE_TOKEN_SECRET
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
       interval: 30s

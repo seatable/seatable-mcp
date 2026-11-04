@@ -256,6 +256,7 @@ Optional:
 - `SEATABLE_ACCESS_TOKEN_TTL` — lifetime of an issued access token in seconds (default `3600`, range `30`–`2592000`). Lower narrows the window after a SeaTable token is revoked; higher spares users a re-prompt if their client renews badly. The refresh token is never issued shorter-lived than the access token.
 - `SEATABLE_MOCK=true` — Enable mock mode for offline testing
 - `CORS_ALLOWED_ORIGINS` — Comma-separated list of allowed origins for CORS (HTTP mode only, disabled if unset)
+- `OPENAI_APPS_CHALLENGE_TOKEN` — Domain verification token from the OpenAI Apps submission. If set, the server answers `GET /.well-known/openai-apps-challenge` with it (HTTP mode only, endpoint absent if unset)
 - `METRICS_PORT` — Prometheus metrics port (default: `9090`, HTTP mode only)
 
 ## Monitoring
