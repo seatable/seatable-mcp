@@ -20,6 +20,7 @@ ${SQL_SYNTAX_RULES}
 
 UPDATE limitations:
 - SET only accepts literal values (strings, numbers, booleans). No functions (date(), now(), upper()…) and no expressions (Amount + 10) allowed.
+- Select columns accept only existing options, spelled exactly (get_schema lists them). Dates need the format YYYY-MM-DD.
 - Columns not updatable via SQL: image, file, formula, link, link-formula, geolocation, auto-number, digital-sign, button. Use update_rows or link_rows for those.
 
 INSERT only works with Big Data storage enabled (Enterprise). For non-archived tables, use append_rows instead.`,
