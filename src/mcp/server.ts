@@ -80,9 +80,9 @@ const CLIENT_ERROR_CODES = new Set([
     'ERR_FILE_TOO_LARGE', 'ERR_AUTH_EXPIRED', 'ERR_RATE_LIMITED',
 ])
 
-/** SeaTable's wording for an unknown row, with its typo; "exi" also matches if it gets fixed. */
+/** SeaTable's wordings for an unknown or malformed row ID, one with a typo; "exi" also matches if it gets fixed. */
 function withRowIdNote(message: string): string {
-    return /row _id not exi/i.test(message) ? `${message}. ${ROW_ID_NOTE}` : message
+    return /row _id not exi|row not found|row does not exist|param row_ids invalid/i.test(message) ? `${message.replace(/\.$/, '')}. ${ROW_ID_NOTE}` : message
 }
 
 export class SeaTableMCPServer {

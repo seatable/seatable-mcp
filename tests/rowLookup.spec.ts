@@ -93,13 +93,15 @@ describe('find_rows with a filter it cannot apply', () => {
     it.each([
         ['an unknown operator', { column: 'Name', op: 'matches', value: 'x' }, 'matches'],
         ['an unknown operator in MongoDB style', { Name: { $regex: 'x' } }, 'regex'],
-        ['two operators at once', { eq: { field: 'Name', value: 'x' }, ne: { field: 'Name', value: 'y' } }, 'one operator'],
+        ['an unknown operator as the key', { matches: { field: 'Name', value: 'x' } }, 'unknown operator "matches"'],
+        ['an unknown operator with column', { matches: { column: 'Name', value: 'x' } }, 'unknown operator "matches"'],
         ['a condition without a field', { eq: { value: 'x' } }, 'field'],
         ['a condition that is no object', { eq: 'x' }, 'field'],
         ['a comparison without a value', { eq: { field: 'Name' } }, 'value'],
-        ['in without a list', { in: { field: 'Name', values: 'x' } }, 'values'],
+        ['an object as the value', { Name: { foo: 'bar' } }, '"Name" needs a single value'],
+        ['a list as the value of gt', { gt: { field: 'Name', value: [1, 2] } }, 'single value'],
         ['or without conditions', { or: [] }, 'or'],
-        ['or that is no list', { or: { eq: { field: 'Name', value: 'x' } } }, 'or'],
+        ['or that is no list', { or: 'x' }, 'or'],
         ['a malformed condition inside or', { or: [{ eq: { field: 'Name', value: 'x' } }, { gt: { value: 1 } }] }, 'field'],
         ['a malformed condition inside not', { not: { eq: { value: 'x' } } }, 'field'],
     ])('reports %s', async (_label, where, expected) => {
@@ -219,6 +221,157 @@ describe('find_rows comparing values of different types', () => {
     })
 })
 
+// What a model clearly means gets repaired: a filter of the wrong shape otherwise
+// costs a round, or matches nothing without a word.
+describe('find_rows repairing a filter', () => {
+    const rows = [
+        { _id: 'a', Name: 'x', Betrag: 5 },
+        { _id: 'b', Name: 'y', Betrag: 10 },
+        { _id: 'c', Name: 'z', Betrag: null },
+    ]
+    const ids = (where: unknown) => rows.filter((r) => evalWhere(r, normalizeWhere(where))).map((r) => r._id)
+
+    it.each<[string, unknown, string[]]>([
+        ['an operator object under the column', { Name: { eq: 'x' } }, ['a']],
+        ['the same in MongoDB style', { Name: { $eq: 'x' } }, ['a']],
+        ['several operators under a column', { Betrag: { gt: 1, lt: 8 } }, ['a']],
+        ['several in MongoDB style', { Betrag: { $gt: 1, $lt: 8 } }, ['a']],
+        ['a symbol under the column', { Betrag: { '>': 7 } }, ['b']],
+        ['column instead of field', { eq: { column: 'Name', value: 'x' } }, ['a']],
+        ['name instead of field', { eq: { name: 'Name', value: 'x' } }, ['a']],
+        ['the column as the key', { eq: { Name: 'x' } }, ['a']],
+        ['several columns as keys', { eq: { Name: 'x', Betrag: 5 } }, ['a']],
+        ['a field and value pair', { eq: ['Name', 'x'] }, ['a']],
+        ['a symbol as the operator', { '=': { field: 'Name', value: 'x' } }, ['a']],
+        ['upper case', { EQ: { field: 'Name', value: 'x' } }, ['a']],
+        ['a dollar', { $eq: { field: 'Name', value: 'x' } }, ['a']],
+        ['a word as the operator', { equals: { field: 'Name', value: 'x' } }, ['a']],
+        ['startswith', { startswith: { field: 'Name', value: 'x' } }, ['a']],
+        ['two operators at once', { gt: { field: 'Betrag', value: 1 }, lt: { field: 'Betrag', value: 8 } }, ['a']],
+        ['an operator next to a column', { gt: { field: 'Betrag', value: 1 }, Name: 'x' }, ['a']],
+        ['or with an object', { or: { Name: 'x', Betrag: 10 } }, ['a', 'b']],
+        ['or with one condition', { or: { eq: { field: 'Name', value: 'x' } } }, ['a']],
+        ['and with an object', { and: { Name: 'x', Betrag: 5 } }, ['a']],
+        ['not with a list', { not: [{ Name: 'x' }, { Betrag: 5 }] }, ['b', 'c']],
+        ['a list under the column', { Name: ['x', 'y'] }, ['a', 'b']],
+        ['in with one value', { in: { field: 'Name', values: 'x' } }, ['a']],
+        ['in with value', { in: { field: 'Name', value: ['x', 'y'] } }, ['a', 'b']],
+        ['in with the column as the key', { in: { Name: ['x', 'y'] } }, ['a', 'b']],
+        ['eq with a list', { eq: { field: 'Name', value: ['x', 'y'] } }, ['a', 'b']],
+        ['ne with a list', { ne: { field: 'Name', value: ['x', 'y'] } }, ['c']],
+        ['not_in', { not_in: { field: 'Name', values: ['x', 'y'] } }, ['c']],
+        ['$nin under the column', { Name: { $nin: ['x', 'y'] } }, ['c']],
+        ['is_null with a column name', { is_null: 'Betrag' }, ['c']],
+        ['is_null with column', { is_null: { column: 'Betrag' } }, ['c']],
+        ['is_not_null', { is_not_null: { field: 'Betrag' } }, ['a', 'b']],
+        ['the column, op, value form with not_in', { column: 'Name', op: 'not_in', value: ['x'] }, ['b', 'c']],
+        ['the column, op, value form with null', { column: 'Betrag', op: '=', value: null }, ['c']],
+        ['a repair nested in or', { or: [{ Name: { eq: 'x' } }, { eq: { column: 'Name', value: 'y' } }] }, ['a', 'b']],
+        ['field and value without an operator', { field: 'Name', value: 'x' }, ['a']],
+    ])('reads %s', (_label, where, expected) => {
+        expect(ids(where)).toEqual(expected)
+    })
+
+    it('takes a word that only looks like an operator as a column if its value is no filter', () => {
+        const row = { _id: 'r', Like: 'yes', Null: 'no' }
+        expect(evalWhere(row, normalizeWhere({ Like: 'yes' }))).toBe(true)
+        expect(evalWhere(row, normalizeWhere({ Null: 'no' }))).toBe(true)
+    })
+
+    describe('column names', () => {
+        const server = () => new SeaTableMCPServer({
+            getMetadata: async () => ({ tables: [{ name: 'T', columns: [{ name: 'Betrag' }, { name: 'Name' }, { name: 'name2' }, { name: 'Doppelt' }, { name: 'doppelt' }] }] }),
+            listRows: async () => ({ rows: [{ _id: 'a', Betrag: 5, Name: 'x' }, { _id: 'b', Betrag: 7, Name: 'y' }] }),
+        } as any)
+        const find = async (args: Record<string, unknown>) => {
+            const result = await callTool(server(), 'find_rows', { table: 'T', ...args })
+            return { result, data: JSON.parse(result.content[0].text) }
+        }
+
+        it('corrects the case of a column and says so', async () => {
+            const { result, data } = await find({ where: { betrag: 5 } })
+            expect(result.isError).toBeUndefined()
+            expect(data.total).toBe(1)
+            expect(data.notice).toContain('"betrag"')
+            expect(data.notice).toContain('"Betrag"')
+        })
+
+        it('removes SQL quotes around a column', async () => {
+            const { data } = await find({ where: { '`Betrag`': 5 } })
+            expect(data.total).toBe(1)
+        })
+
+        it('corrects a nested column and the sort column', async () => {
+            const { data } = await find({ where: { or: [{ betrag: 5 }, { not: { NAME: 'x' } }] }, order_by: 'BETRAG', direction: 'desc' })
+            expect(data.rows.map((r: any) => r._id)).toEqual(['b', 'a'])
+        })
+
+        it('adds no notice when nothing was corrected', async () => {
+            const { data } = await find({ where: { Betrag: 5 } })
+            expect(data).not.toHaveProperty('notice')
+        })
+
+        it('does not guess between two columns or at a typo', async () => {
+            for (const where of [{ DOPPELT: 'x' }, { Nmae: 'x' }]) {
+                const { result, data } = await find({ where })
+                expect(result.isError).toBe(true)
+                expect(data).toContain('not found in table "T"')
+            }
+        })
+    })
+})
+
+// SeaTable returns the number of rows it deleted, also 0 for IDs it doesn't know.
+describe('delete_rows reporting what happened', () => {
+    const del = async (answer: unknown, rowIds: string[]) => {
+        const server = new SeaTableMCPServer({ deleteRows: async () => answer } as any)
+        return JSON.parse((await callTool(server, 'delete_rows', { table: 'T', row_ids: rowIds })).content[0].text)
+    }
+
+    it('reports success if all rows were deleted', async () => {
+        expect(await del({ deleted_rows: 2 }, ['a', 'b'])).toEqual({ success: true, deleted_count: 2 })
+    })
+
+    it('does not report success for IDs that match no row', async () => {
+        const data = await del({ deleted_rows: 0 }, ['D-0008', 'D-0009'])
+        expect(data.success).toBe(false)
+        expect(data.deleted_count).toBe(0)
+        expect(data.notice).toContain('2 of 2')
+        expect(data.notice).toContain('internal _id, not a column value')
+    })
+
+    it('reports a partial deletion', async () => {
+        const data = await del({ deleted_rows: 1 }, ['a', 'D-0008'])
+        expect(data.success).toBe(false)
+        expect(data.deleted_count).toBe(1)
+        expect(data.notice).toContain('1 of 2')
+    })
+
+    it('trusts the call if SeaTable reports no count', async () => {
+        expect(await del({ success: true }, ['a'])).toEqual({ success: true, deleted_count: 1 })
+    })
+})
+
+// SeaTable answers success with a count of 0 for IDs it doesn't know.
+describe('unlink_rows reporting what happened', () => {
+    const unlink = async (answer: unknown) => {
+        const server = new SeaTableMCPServer({ deleteLinks: async () => answer } as any)
+        const result = await callTool(server, 'unlink_rows', { table: 'T', link_column: 'L', pairs: [{ from_row_id: 'a', to_row_id: 'b' }] })
+        return JSON.parse(result.content[0].text)
+    }
+
+    it('does not report success if no link was removed', async () => {
+        const data = await unlink({ deleted_links_count: 0, success: true })
+        expect(data.success).toBe(false)
+        expect(data.deleted_links_count).toBe(0)
+        expect(data.notice).toContain('internal _id, not a column value')
+    })
+
+    it('leaves a removal as it is', async () => {
+        expect(await unlink({ deleted_links_count: 1, success: true })).toEqual({ deleted_links_count: 1, success: true })
+    })
+})
+
 // On a real base, Betrag < 10 also returned the rows without a Betrag.
 describe('find_rows ordering empty cells', () => {
     const cond = (op: string, value: unknown, cell: unknown = null) => evalWhere({ _id: 'r', A: cell }, { [op]: { field: 'A', value } })
@@ -272,6 +425,16 @@ describe('tools that take a row ID', () => {
         expect(text).toContain('internal _id, not a column value')
         expect(text).toContain('query_sql')
     })
+
+    // SeaTable's wording differs per endpoint, all seen on a real base
+    it.each(['ERR_BAD_REQUEST: row _id not exits', 'ERR_BAD_REQUEST: row not found', 'ERR_BAD_REQUEST: Row does not exist.', 'ERR_BAD_REQUEST: param row_ids invalid'])(
+        'adds the note to "%s"', async (message) => {
+            const result = await callTool(fakeServer(makeError('ERR_BAD_REQUEST', message)), 'get_row', { table: 'T', row_id: 'x' })
+            const text = JSON.parse(result.content[0].text)
+            expect(text).toContain(message.replace(/\.$/, ''))
+            expect(text).toContain('internal _id, not a column value')
+        }
+    )
 
     // An empty history looks the same for a wrong ID and for a row whose
     // activities are past SeaTable's retention period, which varies.

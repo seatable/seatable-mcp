@@ -113,6 +113,17 @@ SeaTable SQL behaviour verified against 7.0, which the tool texts rely on:
 
 To see how real models use the tools, run the series in `docs/testing-with-models.md`.
 
+### Row IDs and `find_rows` filters
+
+An answer of "0 rows" reads like a fact, so a request the server can't apply must not end in one. `normalizeWhere()` in `src/mcp/tools/findRows.ts` repairs a filter whose meaning is clear (a JSON string, `{Name: {eq: "x"}}`, `{eq: {column: "Name", value: "x"}}`, aliases such as `=` or `not_in`), and `checkCondition()` reports the rest. `resolveColumns()` corrects the case of a column if only one fits and says so in a `notice`; a typo stays an error. `evalWhere()` compares across types (`"10"` against a number cell as a number) and orders empty cells like SQL, matching none of them. Coverage is in `tests/rowLookup.spec.ts`.
+
+SeaTable's answers for a row ID it doesn't know, verified on SeaTable Cloud. Models tend to pass a visible value such as an auto-number, so `ROW_ID_NOTE` is in every tool description and `withRowIdNote()` adds it to these errors:
+
+- `get_row`, `download_file`, `upload_file`: `row _id not exits`. `update_rows`: `row not found`. `link_rows`: `Row does not exist`.
+- `delete_rows`: `param row_ids invalid` for an ID of another form like `D-0008`, otherwise success with `deleted_rows: 0`. The tool reports that count, not the number of IDs it was given.
+- `unlink_rows`: success with `deleted_links_count: 0`. The tool reports `success: false` with a notice.
+- `get_row_activities`: an empty list, the same as for an existing row whose activities are past the retention period, which varies. The tool looks up the row on an empty result to tell them apart, and its notice names no period.
+
 ### Server instructions and tool annotations
 
 The `instructions` in `src/mcp/server.ts` reach every client, and the SeaTable AI chat plugin (`seatable-plugin-ai-chat`) embeds them in its system prompt instead of keeping its own SQL rules. A change there takes effect for all clients on the next deployment, without a plugin release. If a rule moves here from a client, deploy the server first.

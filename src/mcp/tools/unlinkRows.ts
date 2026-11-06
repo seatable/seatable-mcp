@@ -27,7 +27,12 @@ export const registerUnlinkRows: ToolRegistrar = (server, { client, getInputSche
         pairs: pairs.map((p) => ({ fromRowId: p.from_row_id, toRowId: p.to_row_id })),
       })
 
-      return { content: [{ type: 'text', text: JSON.stringify(result) }] }
+      // SeaTable answers success with a count of 0 for rows it doesn't know
+      const nothingRemoved = result?.deleted_links_count === 0
+      const answer = nothingRemoved
+        ? { ...result, success: false, notice: `No link was removed: these rows don't exist or aren't linked. ${ROW_ID_NOTE}` }
+        : result
+      return { content: [{ type: 'text', text: JSON.stringify(answer) }] }
     }
   )
 }

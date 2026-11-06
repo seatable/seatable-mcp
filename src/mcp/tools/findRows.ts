@@ -160,43 +160,80 @@ export function evalWhere(row: SeaTableRow, where: any): boolean {
 
 // Map common operator aliases to canonical DSL operators
 const OP_ALIASES: Record<string, string> = {
-  '=': 'eq', '==': 'eq', '===': 'eq', 'equals': 'eq',
-  '!=': 'ne', '!==': 'ne', '<>': 'ne', 'not_equal': 'ne',
+  '=': 'eq', '==': 'eq', '===': 'eq', 'equals': 'eq', 'equal': 'eq',
+  '!=': 'ne', '!==': 'ne', '<>': 'ne', 'not_equal': 'ne', 'not_equals': 'ne',
   '>': 'gt', '>=': 'gte', '<': 'lt', '<=': 'lte',
-  'like': 'contains', '$eq': 'eq', '$ne': 'ne', '$gt': 'gt',
-  '$gte': 'gte', '$lt': 'lt', '$lte': 'lte', '$in': 'in',
-  '$contains': 'contains',
+  'like': 'contains', 'startswith': 'starts_with', 'endswith': 'ends_with',
+  'nin': 'not_in', 'notin': 'not_in', 'isnull': 'is_null',
+  'not_null': 'is_not_null', 'notnull': 'is_not_null',
 }
 
-// Detect { column/field, op/operator, value } pattern from weaker models
-function normalizeFilterObject(where: any): any | null {
-  const col = where.column ?? where.field ?? where.col
-  const op = where.op ?? where.operator ?? where.operation
-  if (typeof col !== 'string' || op == null) return null
+const VALUE_OPERATORS = new Set(['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'contains', 'starts_with', 'ends_with'])
+const FIELD_OPERATORS = new Set([...VALUE_OPERATORS, 'in', 'not_in', 'is_null', 'is_not_null'])
+const OPERATORS = new Set([...FIELD_OPERATORS, 'and', 'or', 'not'])
 
-  const canonicalOp = OP_ALIASES[String(op).toLowerCase()] ?? String(op).toLowerCase()
-  const val = where.value ?? where.values
-
-  if (canonicalOp === 'in') return { in: { field: col, values: Array.isArray(val) ? val : [val] } }
-  if (canonicalOp === 'is_null') return { is_null: { field: col } }
-  return { [canonicalOp]: { field: col, value: val } }
+function canonicalOperator(name: string): string {
+  const plain = name.toLowerCase().replace(/^\$/, '')
+  return OP_ALIASES[plain] ?? plain
 }
 
-// Detect MongoDB-style { ColumnName: { $op: value } }
-function normalizeMongoStyle(where: any): any | null {
-  const entries = Object.entries(where)
-  if (entries.length === 0) return null
-  // Every value must be an object with exactly one $-prefixed key
-  if (!entries.every(([, v]) => v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length === 1 && Object.keys(v)[0].startsWith('$'))) return null
+const isPlainObject = (v: unknown): v is Record<string, any> => v !== null && typeof v === 'object' && !Array.isArray(v)
+const allOf = (clauses: any[]) => (clauses.length === 1 ? clauses[0] : { and: clauses })
 
-  const clauses = entries.map(([field, cond]: [string, any]) => {
-    const [mongoOp, val] = Object.entries(cond)[0]
-    const canonicalOp = OP_ALIASES[mongoOp.toLowerCase()] ?? mongoOp.slice(1).toLowerCase()
-    if (canonicalOp === 'in') return { in: { field, values: Array.isArray(val) ? val : [val] } }
-    if (canonicalOp === 'is_null') return { is_null: { field } }
-    return { [canonicalOp]: { field, value: val } }
-  })
-  return clauses.length === 1 ? clauses[0] : { and: clauses }
+/** The canonical condition for an operator, a column and its value or values. */
+function condition(op: string, field: string, value: unknown): any {
+  if (op === 'in') return { in: { field, values: Array.isArray(value) || value === undefined ? value : [value] } }
+  if (op === 'not_in') return { not: condition('in', field, value) }
+  if (op === 'is_null') return { is_null: { field } }
+  if (op === 'is_not_null') return { not: { is_null: { field } } }
+  if (Array.isArray(value) && op === 'eq') return condition('in', field, value)
+  if (Array.isArray(value) && op === 'ne') return condition('not_in', field, value)
+  return { [op]: { field, value } }
+}
+
+const valueOf = (arg: Record<string, any>) => ('value' in arg ? arg.value : arg.values)
+
+/** An operator's argument in any form we can read. What we can't stays as it is, for checkCondition() to report. */
+function conditionFromArg(op: string, arg: any): any {
+  if (typeof arg === 'string' && (op === 'is_null' || op === 'is_not_null')) return condition(op, arg, undefined)
+  if (Array.isArray(arg) && arg.length === 2 && typeof arg[0] === 'string') return condition(op, arg[0], arg[1])
+  if (!isPlainObject(arg)) return { [op]: arg }
+
+  const hasValue = 'value' in arg || 'values' in arg
+  const field = arg.field ?? arg.column ?? arg.col ?? (hasValue ? arg.name : undefined)
+  if (typeof field === 'string') return condition(op, field, valueOf(arg))
+  const entries = Object.entries(arg)
+  if (hasValue || entries.length === 0) return { [op]: arg }
+  return allOf(entries.map(([column, value]) => condition(op, column, value)))
+}
+
+/** One key of a filter object: an operator or a column. */
+function normalizeEntry(key: string, value: any): any {
+  const op = canonicalOperator(key)
+  if (op === 'and' || op === 'or') {
+    if (Array.isArray(value)) return { [op]: value.map(normalize) }
+    if (isPlainObject(value)) return { [op]: Object.entries(value).map(([k, v]) => normalizeEntry(k, v)) }
+    return { [op]: value }
+  }
+  if (op === 'not') return { not: normalize(value) }
+
+  if (FIELD_OPERATORS.has(op)) {
+    const isFilter = isPlainObject(value) || Array.isArray(value) || (typeof value === 'string' && key.toLowerCase().includes('null'))
+    if (isFilter) return conditionFromArg(op, value)
+    // "eq" with a plain value is a mistake, a column called "Like" is not
+    if (key === op) return { [op]: value }
+  }
+  if (key.startsWith('$')) return { [op]: value }
+  // Shaped like a condition, so the key was meant as an operator we don't know
+  if (isPlainObject(value) && (value.field ?? value.column ?? value.col) !== undefined && ('value' in value || 'values' in value)) return { [op]: value }
+
+  if (Array.isArray(value)) return condition('in', key, value)
+  if (isPlainObject(value)) {
+    const entries = Object.entries(value)
+    const areOperators = entries.length > 0 && entries.every(([k]) => k.startsWith('$') || OPERATORS.has(canonicalOperator(k)))
+    if (areOperators) return allOf(entries.map(([k, v]) => condition(canonicalOperator(k), key, v)))
+  }
+  return condition('eq', key, value)
 }
 
 function invalidWhere() {
@@ -213,8 +250,6 @@ function parseWhereString(where: string): object {
   if (parsed === null || typeof parsed !== 'object') throw invalidWhere()
   return parsed
 }
-
-const VALUE_OPERATORS = new Set(['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'contains', 'starts_with', 'ends_with'])
 
 function invalidCondition(problem: string) {
   return makeError('ERR_VALIDATION', `Invalid where: ${problem}. Example: {"eq":{"field":"Name","value":"foo"}}`)
@@ -238,11 +273,24 @@ function checkCondition(where: any): void {
     return
   }
   if (operator !== 'in' && operator !== 'is_null' && !VALUE_OPERATORS.has(operator)) {
-    throw invalidCondition(`unknown operator "${operator}"`)
+    throw invalidCondition(`unknown operator "${operator}", use one of ${[...OPERATORS].join(', ')}`)
   }
   if (typeof arg?.field !== 'string') throw invalidCondition(`"${operator}" needs a field`)
   if (operator === 'in' && !Array.isArray(arg.values)) throw invalidCondition('"in" needs a list of values')
-  if (VALUE_OPERATORS.has(operator) && !('value' in arg)) throw invalidCondition(`"${operator}" needs a value`)
+  if (VALUE_OPERATORS.has(operator)) {
+    if (arg.value === undefined) throw invalidCondition(`"${operator}" needs a value`)
+    if (arg.value !== null && typeof arg.value === 'object') throw invalidCondition(`column "${arg.field}" needs a single value for "${operator}", not an object or list`)
+  }
+}
+
+function renameFields(where: any, names: Map<string, string>): void {
+  if (where === undefined || where === null) return
+  if (where.and || where.or) (where.and ?? where.or).forEach((w: any) => renameFields(w, names))
+  else if (where.not) renameFields(where.not, names)
+  else {
+    const arg: any = Object.values(where)[0]
+    arg.field = names.get(arg.field) ?? arg.field
+  }
 }
 
 /** The columns a checked condition refers to. */
@@ -257,25 +305,41 @@ function fieldsOf(where: any): string[] {
  * An unknown column matches no row either. The metadata decides, as a table may
  * have no rows; as it is cached, a column created a moment ago still counts if a
  * row has it. Tables the metadata doesn't know are left to the lookup of the rows.
- * System columns start with an underscore.
+ * System columns start with an underscore. Returns the names it can correct: SQL
+ * quotes and a different case, if only one column fits. A typo stays an error.
  */
-function checkColumnsExist(metadata: any, table: string, fields: string[], rows: SeaTableRow[]): void {
+function resolveColumns(metadata: any, table: string, fields: string[], rows: SeaTableRow[]): Map<string, string> {
+  const names = new Map<string, string>()
   const columns: Array<{ name: string }> | undefined = metadata?.tables?.find((t: any) => t.name === table)?.columns
-  if (!columns) return
-  const known = new Set(columns.map((c) => c.name))
-  const missing = [...new Set(fields)].filter((f) => !f.startsWith('_') && !known.has(f) && !rows.some((r) => f in r))
-  if (missing.length > 0) {
-    const names = missing.map((f) => `"${f}"`).join(', ')
-    throw makeError('ERR_SCHEMA_UNKNOWN_COLUMN', `Column ${names} not found in table "${table}". Columns: ${[...known].join(', ')}`)
+  if (!columns) return names
+
+  const known = columns.map((c) => c.name)
+  const missing: string[] = []
+  for (const field of new Set(fields)) {
+    const name = field.replace(/^`|`$/g, '')
+    if (name.startsWith('_') || known.includes(name) || rows.some((r) => name in r)) {
+      if (name !== field) names.set(field, name)
+      continue
+    }
+    const sameCase = known.filter((k) => k.toLowerCase() === name.toLowerCase())
+    if (sameCase.length === 1) names.set(field, sameCase[0])
+    else missing.push(field)
   }
+  if (missing.length > 0) {
+    const list = missing.map((f) => `"${f}"`).join(', ')
+    throw makeError('ERR_SCHEMA_UNKNOWN_COLUMN', `Column ${list} not found in table "${table}". Columns: ${known.join(', ')}`)
+  }
+  return names
 }
 
-// Normalize shorthand forms:
-// 1) { column, op, value } or { field, operator, value } -> canonical DSL
-// 2) { Name: { $eq: "foo" } } (MongoDB-style) -> canonical DSL
-// 3) { Name: "foo", Status: "bar" } -> { and: [ { eq: { field:'Name', value:'foo'} }, ... ] }
-// 4) { or: [ ... ] } etc. -> recursively normalized
-// 5) a JSON string, as weaker models send it -> the object it contains
+// Reads a filter in the forms models send, as long as the meaning is clear:
+// 1) a JSON string -> the object it contains
+// 2) { column, op, value } or { field, operator, value }, also without op
+// 3) { Name: "foo", Status: "bar" } -> all of them; a list -> in
+// 4) { Name: { $eq: "foo" } }, { Name: { eq: "foo" } }, { Betrag: { gt: 1, lt: 9 } }
+// 5) { eq: { column: "Name", value: "foo" } }, { eq: { Name: "foo" } }, { eq: ["Name", "foo"] }
+// 6) operator aliases such as "=", "EQ", "$eq", "not_in", "is_not_null"
+// 7) several operators next to each other -> all of them
 // Anything it can't apply is an error: evalWhere() would reject every row, and
 // "0 rows" reads like a real answer and sends the model searching elsewhere.
 export function normalizeWhere(where: any): any {
@@ -296,27 +360,12 @@ function normalize(where: any): any {
   }
 
   // { column/field, op, value } pattern
-  const filterObj = normalizeFilterObject(where)
-  if (filterObj) return filterObj
+  const column = where.column ?? where.field ?? where.col
+  const op = where.op ?? where.operator ?? where.operation
+  if (typeof column === 'string' && op != null) return condition(canonicalOperator(String(op)), column, valueOf(where))
+  if (typeof column === 'string' && 'value' in where) return condition('eq', column, where.value)
 
-  // Canonical DSL operators
-  const operatorKeys = ['eq','ne','in','gt','gte','lt','lte','contains','starts_with','ends_with','is_null','and','or','not']
-  if (operatorKeys.some(k => k in where)) {
-    if (Array.isArray(where.and)) where.and = where.and.map((w: any) => normalize(w))
-    if (Array.isArray(where.or)) where.or = where.or.map((w: any) => normalize(w))
-    if (where.not) where.not = normalize(where.not)
-    return where
-  }
-
-  // MongoDB-style { Name: { $eq: value } }
-  const mongoNorm = normalizeMongoStyle(where)
-  if (mongoNorm) return mongoNorm
-
-  // Plain object => conjunction of eq clauses
-  const entries = Object.entries(where)
-  const clauses = entries.map(([field, value]) => ({ eq: { field, value } }))
-  if (clauses.length === 1) return clauses[0]
-  return { and: clauses }
+  return allOf(Object.entries(where).map(([key, value]) => normalizeEntry(key, value)))
 }
 
 export const registerFindRows: ToolRegistrar = (server, { client, getInputSchema }) => {
@@ -327,7 +376,7 @@ export const registerFindRows: ToolRegistrar = (server, { client, getInputSchema
       description:
         'Find rows using a predicate DSL. Filtering is performed client-side. ' +
         'where is an object, not a string: {"eq":{"field":"Name","value":"foo"}} or shorthand {"Name":"foo"}. ' +
-        'Operators: eq, ne, in, gt, gte, lt, lte, contains, starts_with, ends_with, is_null. ' +
+        'Operators: eq, ne, in, not_in, gt, gte, lt, lte, contains, starts_with, ends_with, is_null, is_not_null. ' +
         'Combine with {"and":[...]} or {"or":[...]}. Negate with {"not":{...}}.',
       inputSchema: getInputSchema(InputSchema),
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -347,15 +396,20 @@ export const registerFindRows: ToolRegistrar = (server, { client, getInputSchema
       }
 
       const fields = [...fieldsOf(normalizedWhere), ...(parsed.order_by ? [parsed.order_by] : [])]
-      if (fields.length > 0) checkColumnsExist(await client.getMetadata(), parsed.table, fields, all)
+      const corrected = fields.length > 0 ? resolveColumns(await client.getMetadata(), parsed.table, fields, all) : new Map<string, string>()
+      renameFields(normalizedWhere, corrected)
+      const orderBy = parsed.order_by && (corrected.get(parsed.order_by) ?? parsed.order_by)
+      const notice = corrected.size > 0
+        ? [...corrected].map(([from, to]) => `Read column "${from}" as "${to}".`).join(' ')
+        : undefined
 
       // Apply predicate locally
   let matched = all.filter((r) => evalWhere(r, normalizedWhere))
 
       // Optional ordering
-      if (parsed.order_by) {
+      if (orderBy) {
         const dir = parsed.direction === 'desc' ? -1 : 1
-        matched = matched.sort((a, b) => dir * compare((a as any)[parsed.order_by!], (b as any)[parsed.order_by!]))
+        matched = matched.sort((a, b) => dir * compare((a as any)[orderBy], (b as any)[orderBy]))
       }
 
       // Paginate locally
@@ -369,7 +423,7 @@ export const registerFindRows: ToolRegistrar = (server, { client, getInputSchema
         content: [
           {
             type: 'text',
-            text: JSON.stringify({ rows: slice, page: pageOut, page_size: pageSizeOut, total: matched.length }),
+            text: JSON.stringify({ ...(notice && { notice }), rows: slice, page: pageOut, page_size: pageSizeOut, total: matched.length }),
           },
         ],
       }
