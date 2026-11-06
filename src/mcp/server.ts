@@ -44,6 +44,7 @@ import { registerUnlinkRows } from './tools/unlinkRows.js'
 import { registerUpdateRows } from './tools/updateRow.js'
 import { registerUploadFile } from './tools/uploadFile.js'
 import { registerUpsertRows } from './tools/upsertRows.js'
+import { ROW_ID_NOTE } from './tools/utils.js'
 
 // Helper function to convert Zod schemas to JSON Schema for MCP tools
 const getInputSchema = (schema: z.ZodType<object>): ListToolsResult['tools'][0]['inputSchema'] => {
@@ -78,6 +79,11 @@ const CLIENT_ERROR_CODES = new Set([
     'ERR_SCHEMA_UNKNOWN_COLUMN', 'ERR_UPSERT_MISSING_KEY', 'ERR_UPSERT_AMBIGUOUS',
     'ERR_FILE_TOO_LARGE', 'ERR_AUTH_EXPIRED', 'ERR_RATE_LIMITED',
 ])
+
+/** SeaTable's wording for an unknown row, with its typo; "exi" also matches if it gets fixed. */
+function withRowIdNote(message: string): string {
+    return /row _id not exi/i.test(message) ? `${message}. ${ROW_ID_NOTE}` : message
+}
 
 export class SeaTableMCPServer {
     private readonly server: Server
@@ -331,7 +337,7 @@ export class SeaTableMCPServer {
                 content: [{
                     type: 'text',
                     text: JSON.stringify(
-                        `Error in tool ${toolName}: ${error instanceof Error ? error.message : String(error)}`
+                        `Error in tool ${toolName}: ${withRowIdNote(error instanceof Error ? error.message : String(error))}`
                     ),
                 }],
                 isError: true,

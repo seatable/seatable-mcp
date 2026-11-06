@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { ToolRegistrar } from './types.js'
+import { ROW_ID_NOTE } from './utils.js'
 
 const InputSchema = z.object({
     table: z.string().describe('Target table name'),
@@ -12,7 +13,7 @@ export const registerDeleteRows: ToolRegistrar = (server, { client, getInputSche
         'delete_rows',
         {
             title: 'Delete Rows',
-            description: 'Delete one or more rows from a table by their IDs.',
+            description: `Delete one or more rows from a table by their IDs. ${ROW_ID_NOTE}`,
             inputSchema: getInputSchema(InputSchema),
             annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
         },

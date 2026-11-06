@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { ToolRegistrar } from './types.js'
+import { ROW_ID_NOTE } from './utils.js'
 
 const InputSchema = z.object({
     table: z.string().describe('Target table name'),
@@ -16,7 +17,7 @@ export const registerUploadFile: ToolRegistrar = (server, { client, getInputSche
         'upload_file',
         {
             title: 'Upload File',
-            description: 'Upload a file or image to a row. Accepts base64-encoded file data and attaches it to the specified file or image column. By default appends to existing files; set replace=true to overwrite.',
+            description: `Upload a file or image to a row. Accepts base64-encoded file data and attaches it to the specified file or image column. By default appends to existing files; set replace=true to overwrite. ${ROW_ID_NOTE}`,
             inputSchema: getInputSchema(InputSchema),
             annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
         },

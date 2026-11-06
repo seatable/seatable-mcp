@@ -1,3 +1,7 @@
+/** For every tool that takes a row ID: models tend to pass a visible value such as an auto-number. */
+export const ROW_ID_NOTE =
+    'Row IDs are the internal _id, not a column value such as an auto-number. To find a row by a column value, use query_sql: SELECT * returns the _id too.'
+
 /** Strip redundant and UI-only fields from query_sql metadata. */
 export function cleanSqlMetadata(metadata: any): any {
     if (!Array.isArray(metadata)) return metadata

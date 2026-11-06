@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { ToolRegistrar } from './types.js'
+import { ROW_ID_NOTE } from './utils.js'
 
 const InputSchema = z.object({
     table: z.string().describe('Table name (used for context in the response)'),
@@ -54,7 +55,7 @@ export const registerGetRowActivities: ToolRegistrar = (server, { client, getInp
         'get_row_activities',
         {
             title: 'Get Row Activities',
-            description: 'Get the change history of a specific row. Returns a list of activities showing who changed what and when, including old and new values. 25 activities per page.',
+            description: `Get the change history of a specific row. Returns a list of activities showing who changed what and when, including old and new values. 25 activities per page. ${ROW_ID_NOTE}`,
             inputSchema: getInputSchema(InputSchema),
             annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         },

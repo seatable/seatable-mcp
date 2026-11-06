@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { ToolRegistrar } from './types.js'
+import { ROW_ID_NOTE } from './utils.js'
 
 const InputSchema = z.object({
     table: z.string().describe('Target table name'),
@@ -14,7 +15,7 @@ export const registerDownloadFile: ToolRegistrar = (server, { client, getInputSc
         'download_file',
         {
             title: 'Download File',
-            description: `Read the content of a file attached to a row in a file or image column. Use get_row first to see available files in the column, then pass the exact file_name to select a specific file.
+            description: `Read the content of a file attached to a row in a file or image column. Use get_row first to see available files in the column, then pass the exact file_name to select a specific file. ${ROW_ID_NOTE}
 
 Returns JSON with: file_name, file_size (bytes), content, content_type, and download_link (only when content_type is "binary_url").
 

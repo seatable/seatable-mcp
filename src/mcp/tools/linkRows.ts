@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { ToolRegistrar } from './types.js'
+import { ROW_ID_NOTE } from './utils.js'
 
 const InputSchema = z.object({
   table: z.string().describe('Source table name'),
@@ -13,7 +14,7 @@ export const registerLinkRows: ToolRegistrar = (server, { client, getInputSchema
     'link_rows',
     {
       title: 'Link Rows',
-      description: 'Create links between rows via the dedicated links endpoint. This is the ONLY way to create links — link columns cannot be written via add_row or update_rows.',
+      description: `Create links between rows via the dedicated links endpoint. This is the ONLY way to create links — link columns cannot be written via add_row or update_rows. ${ROW_ID_NOTE}`,
       inputSchema: getInputSchema(InputSchema),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },

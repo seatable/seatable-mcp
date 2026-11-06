@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { ToolRegistrar } from './types.js'
+import { ROW_ID_NOTE } from './utils.js'
 
 const InputSchema = z.object({
   table: z.string().describe('Source table name'),
@@ -13,7 +14,7 @@ export const registerUnlinkRows: ToolRegistrar = (server, { client, getInputSche
     'unlink_rows',
     {
       title: 'Unlink Rows',
-      description: 'Remove links between rows via the dedicated links endpoint. This is the ONLY way to remove links — link columns cannot be modified via update_rows.',
+      description: `Remove links between rows via the dedicated links endpoint. This is the ONLY way to remove links — link columns cannot be modified via update_rows. ${ROW_ID_NOTE}`,
       inputSchema: getInputSchema(InputSchema),
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },

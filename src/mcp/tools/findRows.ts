@@ -187,22 +187,84 @@ function parseWhereString(where: string): object {
   return parsed
 }
 
+const VALUE_OPERATORS = new Set(['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'contains', 'starts_with', 'ends_with'])
+
+function invalidCondition(problem: string) {
+  return makeError('ERR_VALIDATION', `Invalid where: ${problem}. Example: {"eq":{"field":"Name","value":"foo"}}`)
+}
+
+/** Reject what evalWhere() couldn't apply. An empty "and" stays valid: it's how {} and [] mean "no filter". */
+function checkCondition(where: any): void {
+  if (where === null || typeof where !== 'object' || Array.isArray(where)) throw invalidWhere()
+  const operators = Object.keys(where)
+  if (operators.length !== 1) throw invalidCondition(`a condition needs exactly one operator, got: ${operators.join(', ')}`)
+
+  const operator = operators[0]
+  const arg = where[operator]
+  if (operator === 'and' || operator === 'or') {
+    if (!Array.isArray(arg) || (operator === 'or' && arg.length === 0)) throw invalidCondition(`"${operator}" needs a list of conditions`)
+    arg.forEach(checkCondition)
+    return
+  }
+  if (operator === 'not') {
+    checkCondition(arg)
+    return
+  }
+  if (operator !== 'in' && operator !== 'is_null' && !VALUE_OPERATORS.has(operator)) {
+    throw invalidCondition(`unknown operator "${operator}"`)
+  }
+  if (typeof arg?.field !== 'string') throw invalidCondition(`"${operator}" needs a field`)
+  if (operator === 'in' && !Array.isArray(arg.values)) throw invalidCondition('"in" needs a list of values')
+  if (VALUE_OPERATORS.has(operator) && !('value' in arg)) throw invalidCondition(`"${operator}" needs a value`)
+}
+
+/** The columns a checked condition refers to. */
+function fieldsOf(where: any): string[] {
+  if (where === undefined || where === null) return []
+  if (where.and || where.or) return (where.and ?? where.or).flatMap(fieldsOf)
+  if (where.not) return fieldsOf(where.not)
+  return [(Object.values(where)[0] as { field: string }).field]
+}
+
+/**
+ * An unknown column matches no row either. The metadata decides, as a table may
+ * have no rows; as it is cached, a column created a moment ago still counts if a
+ * row has it. Tables the metadata doesn't know are left to the lookup of the rows.
+ * System columns start with an underscore.
+ */
+function checkColumnsExist(metadata: any, table: string, fields: string[], rows: SeaTableRow[]): void {
+  const columns: Array<{ name: string }> | undefined = metadata?.tables?.find((t: any) => t.name === table)?.columns
+  if (!columns) return
+  const known = new Set(columns.map((c) => c.name))
+  const missing = [...new Set(fields)].filter((f) => !f.startsWith('_') && !known.has(f) && !rows.some((r) => f in r))
+  if (missing.length > 0) {
+    const names = missing.map((f) => `"${f}"`).join(', ')
+    throw makeError('ERR_SCHEMA_UNKNOWN_COLUMN', `Column ${names} not found in table "${table}". Columns: ${[...known].join(', ')}`)
+  }
+}
+
 // Normalize shorthand forms:
 // 1) { column, op, value } or { field, operator, value } -> canonical DSL
 // 2) { Name: { $eq: "foo" } } (MongoDB-style) -> canonical DSL
 // 3) { Name: "foo", Status: "bar" } -> { and: [ { eq: { field:'Name', value:'foo'} }, ... ] }
 // 4) { or: [ ... ] } etc. -> recursively normalized
 // 5) a JSON string, as weaker models send it -> the object it contains
-// Anything else is an error: evalWhere() would reject every row, and "0 rows"
-// reads like a real answer and sends the model searching elsewhere.
+// Anything it can't apply is an error: evalWhere() would reject every row, and
+// "0 rows" reads like a real answer and sends the model searching elsewhere.
 export function normalizeWhere(where: any): any {
+  const normalized = normalize(where)
+  if (normalized !== undefined && normalized !== null) checkCondition(normalized)
+  return normalized
+}
+
+function normalize(where: any): any {
   if (where === undefined || where === null) return where
-  if (typeof where === 'string') return normalizeWhere(parseWhereString(where))
+  if (typeof where === 'string') return normalize(parseWhereString(where))
   if (typeof where !== 'object') throw invalidWhere()
 
   // Array of conditions → AND
   if (Array.isArray(where)) {
-    const clauses = where.map((w: any) => normalizeWhere(w))
+    const clauses = where.map((w: any) => normalize(w))
     return clauses.length === 1 ? clauses[0] : { and: clauses }
   }
 
@@ -213,9 +275,9 @@ export function normalizeWhere(where: any): any {
   // Canonical DSL operators
   const operatorKeys = ['eq','ne','in','gt','gte','lt','lte','contains','starts_with','ends_with','is_null','and','or','not']
   if (operatorKeys.some(k => k in where)) {
-    if (Array.isArray(where.and)) where.and = where.and.map((w: any) => normalizeWhere(w))
-    if (Array.isArray(where.or)) where.or = where.or.map((w: any) => normalizeWhere(w))
-    if (where.not) where.not = normalizeWhere(where.not)
+    if (Array.isArray(where.and)) where.and = where.and.map((w: any) => normalize(w))
+    if (Array.isArray(where.or)) where.or = where.or.map((w: any) => normalize(w))
+    if (where.not) where.not = normalize(where.not)
     return where
   }
 
@@ -256,6 +318,9 @@ export const registerFindRows: ToolRegistrar = (server, { client, getInputSchema
         if (!res.rows.length || res.rows.length < pageSizeFetch) break
         page += 1
       }
+
+      const fields = [...fieldsOf(normalizedWhere), ...(parsed.order_by ? [parsed.order_by] : [])]
+      if (fields.length > 0) checkColumnsExist(await client.getMetadata(), parsed.table, fields, all)
 
       // Apply predicate locally
   let matched = all.filter((r) => evalWhere(r, normalizedWhere))
