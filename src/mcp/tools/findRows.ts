@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { makeError } from '../../errors.js'
 import type { SeaTableRow } from '../../seatable/types.js'
 import { ToolRegistrar } from './types.js'
 
@@ -171,13 +172,33 @@ function normalizeMongoStyle(where: any): any | null {
   return clauses.length === 1 ? clauses[0] : { and: clauses }
 }
 
+function invalidWhere() {
+  return makeError('ERR_VALIDATION', 'where must be an object, e.g. {"eq":{"field":"Name","value":"foo"}} or {"Name":"foo"}')
+}
+
+function parseWhereString(where: string): object {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(where)
+  } catch {
+    throw invalidWhere()
+  }
+  if (parsed === null || typeof parsed !== 'object') throw invalidWhere()
+  return parsed
+}
+
 // Normalize shorthand forms:
 // 1) { column, op, value } or { field, operator, value } -> canonical DSL
 // 2) { Name: { $eq: "foo" } } (MongoDB-style) -> canonical DSL
 // 3) { Name: "foo", Status: "bar" } -> { and: [ { eq: { field:'Name', value:'foo'} }, ... ] }
 // 4) { or: [ ... ] } etc. -> recursively normalized
+// 5) a JSON string, as weaker models send it -> the object it contains
+// Anything else is an error: evalWhere() would reject every row, and "0 rows"
+// reads like a real answer and sends the model searching elsewhere.
 export function normalizeWhere(where: any): any {
-  if (!where || typeof where !== 'object') return where
+  if (where === undefined || where === null) return where
+  if (typeof where === 'string') return normalizeWhere(parseWhereString(where))
+  if (typeof where !== 'object') throw invalidWhere()
 
   // Array of conditions → AND
   if (Array.isArray(where)) {
@@ -216,7 +237,7 @@ export const registerFindRows: ToolRegistrar = (server, { client, getInputSchema
       title: 'Find Rows',
       description:
         'Find rows using a predicate DSL. Filtering is performed client-side. ' +
-        'where format: {"eq":{"field":"Name","value":"foo"}} or shorthand {"Name":"foo"}. ' +
+        'where is an object, not a string: {"eq":{"field":"Name","value":"foo"}} or shorthand {"Name":"foo"}. ' +
         'Operators: eq, ne, in, gt, gte, lt, lte, contains, starts_with, ends_with, is_null. ' +
         'Combine with {"and":[...]} or {"or":[...]}. Negate with {"not":{...}}.',
       inputSchema: getInputSchema(InputSchema),
