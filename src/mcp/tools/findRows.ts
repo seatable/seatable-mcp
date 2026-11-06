@@ -88,9 +88,10 @@ function matchesValue(cell: unknown, value: unknown): boolean {
 /**
  * Order a cell against a filter value of another type as numbers. As text, "9.49"
  * would be greater than "10". NaN fails every comparison, so what can't be read as
- * a number matches nothing.
+ * a number matches nothing, and neither does an empty cell, as in SQL.
  */
 function compareToValue(cell: unknown, value: unknown): number {
+  if (cell === undefined || cell === null || cell === '' || value === undefined || value === null) return NaN
   if (typeof cell === 'number' && typeof value === 'string') return cell - (plainNumber(value) ?? NaN)
   if (typeof cell === 'string' && typeof value === 'number') return (plainNumber(cell) ?? NaN) - value
   return compare(cell, value)

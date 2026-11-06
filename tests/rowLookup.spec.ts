@@ -219,6 +219,32 @@ describe('find_rows comparing values of different types', () => {
     })
 })
 
+// On a real base, Betrag < 10 also returned the rows without a Betrag.
+describe('find_rows ordering empty cells', () => {
+    const cond = (op: string, value: unknown, cell: unknown = null) => evalWhere({ _id: 'r', A: cell }, { [op]: { field: 'A', value } })
+
+    it.each(['gt', 'gte', 'lt', 'lte'])('%s never matches an empty cell', (op) => {
+        for (const value of [10, '10', 'abc', '2026-01-01']) {
+            expect(cond(op, value, null)).toBe(false)
+            expect(cond(op, value, undefined)).toBe(false)
+            expect(cond(op, value, '')).toBe(false)
+        }
+    })
+
+    it.each(['gt', 'gte', 'lt', 'lte'])('%s against null matches nothing', (op) => {
+        expect(cond(op, null, 5)).toBe(false)
+        expect(cond(op, null, null)).toBe(false)
+    })
+
+    it('still orders filled cells and finds empty ones with is_null and eq', () => {
+        expect(cond('lt', 10, 5)).toBe(true)
+        expect(cond('gte', 0, 0)).toBe(true)
+        expect(evalWhere({ _id: 'r', A: null }, { is_null: { field: 'A' } })).toBe(true)
+        expect(cond('eq', null, null)).toBe(true)
+        expect(cond('ne', 10, null)).toBe(true)
+    })
+})
+
 // Seen in production: a model passed the value of an auto-number column as row_id.
 describe('tools that take a row ID', () => {
     const fakeServer = (error: Error) => {
