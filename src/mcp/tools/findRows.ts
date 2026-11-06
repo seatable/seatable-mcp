@@ -70,6 +70,32 @@ function get(row: SeaTableRow, path: string): unknown {
   return (row as any)[path]
 }
 
+// Models often send values as text. Only plain numbers count: "55,99" and "1,000"
+// could mean several things, and Number() would also accept "", "0x10" and "1e3".
+function plainNumber(text: string): number | undefined {
+  return /^-?\d+(\.\d+)?$/.test(text) ? Number(text) : undefined
+}
+
+/** Is the cell equal to a filter value, which may be of another type? */
+function matchesValue(cell: unknown, value: unknown): boolean {
+  if (cell === value) return true
+  if (typeof cell === 'number' && typeof value === 'string') return plainNumber(value) === cell
+  if (typeof cell === 'string' && typeof value === 'number') return cell === String(value)
+  if (typeof cell === 'boolean' && typeof value === 'string') return value === String(cell)
+  return false
+}
+
+/**
+ * Order a cell against a filter value of another type as numbers. As text, "9.49"
+ * would be greater than "10". NaN fails every comparison, so what can't be read as
+ * a number matches nothing.
+ */
+function compareToValue(cell: unknown, value: unknown): number {
+  if (typeof cell === 'number' && typeof value === 'string') return cell - (plainNumber(value) ?? NaN)
+  if (typeof cell === 'string' && typeof value === 'number') return (plainNumber(cell) ?? NaN) - value
+  return compare(cell, value)
+}
+
 export function evalWhere(row: SeaTableRow, where: any): boolean {
   if (where == null) return true
   if (where.and) return (where.and as any[]).every((w: any) => evalWhere(row, w))
@@ -78,32 +104,32 @@ export function evalWhere(row: SeaTableRow, where: any): boolean {
 
   if (where.eq) {
     const { field, value } = where.eq
-    return get(row, field) === value
+    return matchesValue(get(row, field), value)
   }
   if (where.ne) {
     const { field, value } = where.ne
-    return get(row, field) !== value
+    return !matchesValue(get(row, field), value)
   }
   if (where.in) {
     const { field, values } = where.in
     const v = get(row, field)
-    return (values as unknown[]).some((x) => x === v)
+    return (values as unknown[]).some((x) => matchesValue(v, x))
   }
   if (where.gt) {
     const { field, value } = where.gt
-    return compare(get(row, field), value) > 0
+    return compareToValue(get(row, field), value) > 0
   }
   if (where.gte) {
     const { field, value } = where.gte
-    return compare(get(row, field), value) >= 0
+    return compareToValue(get(row, field), value) >= 0
   }
   if (where.lt) {
     const { field, value } = where.lt
-    return compare(get(row, field), value) < 0
+    return compareToValue(get(row, field), value) < 0
   }
   if (where.lte) {
     const { field, value } = where.lte
-    return compare(get(row, field), value) <= 0
+    return compareToValue(get(row, field), value) <= 0
   }
   if (where.contains) {
     const { field, value, case_sensitive } = where.contains

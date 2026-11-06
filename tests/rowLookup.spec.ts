@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { makeError } from '../src/errors'
 import { buildServer, SeaTableMCPServer } from '../src/mcp/server'
-import { normalizeWhere } from '../src/mcp/tools/findRows'
+import { evalWhere, normalizeWhere } from '../src/mcp/tools/findRows'
 
 beforeAll(() => {
     process.env.SEATABLE_SERVER_URL = 'http://localhost'
@@ -151,6 +151,71 @@ describe('find_rows with a filter it cannot apply', () => {
     it('leaves a table it does not know to the lookup of the rows', async () => {
         const result = await callTool(server, 'find_rows', { table: 'NoSuchTable', where: { Name: 'x' } })
         expect(result.isError).toBeUndefined()
+    })
+})
+
+// Weaker models send values as text. Comparing them as text gave wrong results,
+// not just missing ones: "9.49" is greater than "10".
+describe('find_rows comparing values of different types', () => {
+    const row = { _id: 'r', Betrag: 9.49, Nummer: '123', Null: null, Done: true }
+    const matches = (where: any) => evalWhere(row, where)
+    const cond = (op: string, field: string, value: unknown) => ({ [op]: { field, value } })
+
+    it.each([
+        ['eq', 'Betrag', '9.49', true],
+        ['eq', 'Betrag', '9.5', false],
+        ['ne', 'Betrag', '9.49', false],
+        ['ne', 'Betrag', '9.5', true],
+        ['gt', 'Betrag', '10', false],
+        ['gt', 'Betrag', '9', true],
+        ['gte', 'Betrag', '9.49', true],
+        ['lt', 'Betrag', '10', true],
+        ['lt', 'Betrag', '9', false],
+        ['lte', 'Betrag', '9.49', true],
+    ])('a number cell: %s %s %s is %s', (op, field, value, expected) => {
+        expect(matches(cond(op, field, value))).toBe(expected)
+    })
+
+    it('in compares the same way', () => {
+        expect(matches({ in: { field: 'Betrag', values: ['1', '9.49'] } })).toBe(true)
+        expect(matches({ in: { field: 'Nummer', values: [1, 123] } })).toBe(true)
+        expect(matches({ in: { field: 'Betrag', values: ['1', '2'] } })).toBe(false)
+    })
+
+    it.each(['9,49', 'abc', '', ' ', '0x10', '1e3', 'Infinity', '9.49 '])('does not read %j as a number', (value) => {
+        expect(evalWhere({ _id: 'r', A: 16, B: 1000, C: 9.49 }, { or: ['A', 'B', 'C'].map((f) => cond('eq', f, value)) })).toBe(false)
+        expect(matches(cond('gt', 'Betrag', value))).toBe(false)
+        expect(matches(cond('lt', 'Betrag', value))).toBe(false)
+    })
+
+    it('a text cell matches a number only if the text is the same', () => {
+        expect(matches(cond('eq', 'Nummer', 123))).toBe(true)
+        expect(matches(cond('ne', 'Nummer', 123))).toBe(false)
+        expect(evalWhere({ _id: 'r', Nummer: '0123' }, cond('eq', 'Nummer', 123))).toBe(false)
+        expect(evalWhere({ _id: 'r', Nummer: 'abc' }, cond('eq', 'Nummer', 123))).toBe(false)
+    })
+
+    it('a text cell with a number is ordered as a number', () => {
+        expect(matches(cond('gt', 'Nummer', 99))).toBe(true)
+        expect(matches(cond('lt', 'Nummer', 99))).toBe(false)
+        expect(evalWhere({ _id: 'r', Nummer: 'abc' }, cond('gt', 'Nummer', 99))).toBe(false)
+    })
+
+    it('a checkbox cell matches the words true and false', () => {
+        expect(matches(cond('eq', 'Done', 'true'))).toBe(true)
+        expect(matches(cond('eq', 'Done', 'false'))).toBe(false)
+        expect(matches(cond('ne', 'Done', 'false'))).toBe(true)
+        expect(matches(cond('eq', 'Done', 'yes'))).toBe(false)
+    })
+
+    it('values of the same type behave as before', () => {
+        expect(matches(cond('eq', 'Betrag', 9.49))).toBe(true)
+        expect(matches(cond('gt', 'Betrag', 10))).toBe(false)
+        expect(matches(cond('eq', 'Nummer', '123'))).toBe(true)
+        expect(matches(cond('gt', 'Nummer', '1'))).toBe(true)
+        expect(matches(cond('eq', 'Null', null))).toBe(true)
+        expect(matches(cond('eq', 'Null', 'null'))).toBe(false)
+        expect(evalWhere({ _id: 'r', D: '2026-08-05' }, cond('gt', 'D', '2026-07-01'))).toBe(true)
     })
 })
 
