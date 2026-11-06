@@ -4,7 +4,7 @@ import { ToolRegistrar } from './types.js'
 import { ROW_ID_NOTE } from './utils.js'
 
 const InputSchema = z.object({
-    table: z.string().describe('Table name (used for context in the response)'),
+    table: z.string().describe('Table name of the row'),
     row_id: z.string().describe('Row ID to get the activity history for'),
     page: z.number().int().min(1).default(1).optional().describe('Page number (default 1, 25 activities per page)'),
 })
@@ -50,6 +50,10 @@ function cleanActivity(activity: any): Record<string, unknown> {
     }
 }
 
+// The retention period varies, so this names none
+const NO_ACTIVITIES_NOTICE =
+    'The row exists, but no activities are available. SeaTable keeps row activities only for a limited time, so this does not mean the row was never changed.'
+
 export const registerGetRowActivities: ToolRegistrar = (server, { client, getInputSchema }) => {
     server.registerTool(
         'get_row_activities',
@@ -60,13 +64,18 @@ export const registerGetRowActivities: ToolRegistrar = (server, { client, getInp
             annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         },
         async (args: unknown) => {
-            const { row_id, page } = InputSchema.parse(args)
+            const { table, row_id, page } = InputSchema.parse(args)
             const result = await client.getRowActivities(row_id, page)
             const cleaned = result.activities.map(cleanActivity)
+            // SeaTable answers the same for a wrong ID and for a row whose activities
+            // are past its retention period. The lookup throws if the row doesn't exist.
+            const noActivities = result.total_count === 0
+            if (noActivities) await client.getRow(table, row_id)
             return {
                 content: [{
                     type: 'text',
                     text: JSON.stringify({
+                        ...(noActivities && { notice: NO_ACTIVITIES_NOTICE }),
                         activities: cleaned,
                         total_count: result.total_count,
                     }),

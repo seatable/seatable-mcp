@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { makeError } from '../src/errors'
 import { buildServer, SeaTableMCPServer } from '../src/mcp/server'
@@ -180,6 +180,58 @@ describe('tools that take a row ID', () => {
         expect(text).toContain('row _id not exits')
         expect(text).toContain('internal _id, not a column value')
         expect(text).toContain('query_sql')
+    })
+
+    // An empty history looks the same for a wrong ID and for a row whose
+    // activities are past SeaTable's retention period, which varies.
+    describe('get_row_activities without activities', () => {
+        const history = (overrides: Record<string, unknown>) => {
+            const getRow = vi.fn(async () => ({ _id: 'row_1' }))
+            const server = new SeaTableMCPServer({
+                getRow,
+                getRowActivities: async () => ({ activities: [], total_count: 0 }),
+                ...overrides,
+            } as any)
+            return { getRow, call: () => callTool(server, 'get_row_activities', { table: 'T', row_id: 'row_1' }) }
+        }
+
+        it('reports a row that does not exist', async () => {
+            const { call } = history({ getRow: async () => { throw makeError('ERR_BAD_REQUEST', 'row _id not exits') } })
+            const result = await call()
+            expect(result.isError).toBe(true)
+            const text = JSON.parse(result.content[0].text)
+            expect(text).toContain('row _id not exits')
+            expect(text).toContain('internal _id, not a column value')
+        })
+
+        it('says that a row without activities may still have been changed, without naming a period', async () => {
+            const { call } = history({})
+            const result = await call()
+            expect(result.isError).toBeUndefined()
+            const data = JSON.parse(result.content[0].text)
+            expect(data.activities).toEqual([])
+            expect(data.total_count).toBe(0)
+            expect(data.notice).toContain('limited time')
+            expect(data.notice).toContain('does not mean')
+            expect(data.notice).not.toMatch(/\d/)
+        })
+
+        it('does not look up the row or add a notice if there are activities', async () => {
+            const { call, getRow } = history({
+                getRowActivities: async () => ({ activities: [{ op_type: 'insert_row', detail: {} }], total_count: 1 }),
+            })
+            const data = JSON.parse((await call()).content[0].text)
+            expect(getRow).not.toHaveBeenCalled()
+            expect(data.total_count).toBe(1)
+            expect(data).not.toHaveProperty('notice')
+        })
+
+        it('does not look up the row on an empty later page', async () => {
+            const { call, getRow } = history({ getRowActivities: async () => ({ activities: [], total_count: 30 }) })
+            const data = JSON.parse((await call()).content[0].text)
+            expect(getRow).not.toHaveBeenCalled()
+            expect(data).not.toHaveProperty('notice')
+        })
     })
 
     it('leaves other errors as they are', async () => {
