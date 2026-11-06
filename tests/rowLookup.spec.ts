@@ -321,6 +321,93 @@ describe('find_rows repairing a filter', () => {
     })
 })
 
+// On a real base, Datum >= "01.08.2026" returned every row with a date: as text,
+// "2026-07-13" is greater than "01.08.2026".
+describe('find_rows with a date in another format', () => {
+    const server = () => new SeaTableMCPServer({
+        getMetadata: async () => ({
+            tables: [{
+                name: 'T',
+                columns: [{ name: 'Datum', type: 'date' }, { name: 'Geändert', type: 'mtime' }, { name: 'Code', type: 'text' }],
+            }],
+        }),
+        listRows: async () => ({
+            rows: [
+                { _id: 'a', Datum: '2026-07-13', 'Geändert': '2026-07-13T10:00:00+02:00', Code: '01.08.2026' },
+                { _id: 'b', Datum: '2026-08-13', 'Geändert': '2026-08-13T10:00:00+02:00', Code: 'x' },
+            ],
+        }),
+    } as any)
+    const find = async (where: unknown) => {
+        const result = await callTool(server(), 'find_rows', { table: 'T', where })
+        return { result, data: JSON.parse(result.content[0].text) }
+    }
+
+    it.each<[string, unknown, string]>([
+        ['gte with a German date', { gte: { field: 'Datum', value: '01.08.2026' } }, '01.08.2026'],
+        ['eq with a German date', { eq: { field: 'Datum', value: '13.07.2026' } }, '13.07.2026'],
+        ['ne with a German date', { ne: { field: 'Datum', value: '13.07.2026' } }, '13.07.2026'],
+        ['a short year', { lt: { field: 'Datum', value: '1.8.26' } }, '1.8.26'],
+        ['slashes', { gt: { field: 'Datum', value: '08/01/2026' } }, '08/01/2026'],
+        ['dashes, day first', { gt: { field: 'Datum', value: '01-08-2026' } }, '01-08-2026'],
+        ['a list for in', { in: { field: 'Datum', values: ['2026-07-13', '13.07.2026'] } }, '13.07.2026'],
+        ['a nested condition', { or: [{ Code: 'x' }, { not: { lt: { field: 'Datum', value: '01.08.2026' } } }] }, '01.08.2026'],
+        ['a column with a corrected name', { gte: { field: 'datum', value: '01.08.2026' } }, '01.08.2026'],
+        ['a modification time column', { gte: { field: 'Geändert', value: '01.08.2026' } }, '01.08.2026'],
+    ])('reports %s and names the format', async (_label, where, value) => {
+        const { result, data } = await find(where)
+        expect(result.isError).toBe(true)
+        expect(data).toContain('YYYY-MM-DD')
+        expect(data).toContain(value)
+    })
+
+    it.each<[string, unknown, number]>([
+        ['an ISO date', { gte: { field: 'Datum', value: '2026-08-01' } }, 1],
+        ['an ISO date with a time', { gte: { field: 'Geändert', value: '2026-08-01T00:00:00' } }, 1],
+        ['such a text in a text column', { eq: { field: 'Code', value: '01.08.2026' } }, 1],
+        ['is_null on a date column', { is_null: { field: 'Datum' } }, 0],
+    ])('accepts %s', async (_label, where, total) => {
+        const { result, data } = await find(where)
+        expect(result.isError).toBeUndefined()
+        expect(data.total).toBe(total)
+    })
+})
+
+// The API returns dates as 2026-08-05T00:00:00+02:00. As text, that never equals
+// 2026-08-05 and is greater than it, which moved every boundary by a day.
+describe('find_rows comparing a date with a date cell', () => {
+    const row = { _id: 'r', Datum: '2026-08-05T00:00:00+02:00', Zeit: '2026-08-05T23:30:00.5+02:00', Text: 'abc' }
+    const matches = (op: string, field: string, value: unknown) => evalWhere(row, { [op]: { field, value } })
+
+    it.each<[string, string, boolean]>([
+        ['eq', '2026-08-05', true],
+        ['eq', '2026-08-04', false],
+        ['ne', '2026-08-05', false],
+        ['ne', '2026-08-04', true],
+        ['gt', '2026-08-05', false],
+        ['gt', '2026-08-04', true],
+        ['gte', '2026-08-05', true],
+        ['gte', '2026-08-06', false],
+        ['lt', '2026-08-05', false],
+        ['lt', '2026-08-06', true],
+        ['lte', '2026-08-05', true],
+        ['lte', '2026-08-04', false],
+    ])('%s %s is %s', (op, value, expected) => {
+        expect(matches(op, 'Datum', value)).toBe(expected)
+        expect(matches(op, 'Zeit', value)).toBe(expected)
+    })
+
+    it('in compares the same way', () => {
+        expect(evalWhere(row, { in: { field: 'Datum', values: ['2026-01-01', '2026-08-05'] } })).toBe(true)
+    })
+
+    it('leaves a time in the filter and other text as they are', () => {
+        expect(matches('gt', 'Zeit', '2026-08-05T23:00')).toBe(true)
+        expect(matches('lt', 'Zeit', '2026-08-05T23:00')).toBe(false)
+        expect(matches('eq', 'Text', '2026-08-05')).toBe(false)
+    })
+})
+
 // SeaTable returns the number of rows it deleted, also 0 for IDs it doesn't know.
 describe('delete_rows reporting what happened', () => {
     const del = async (answer: unknown, rowIds: string[]) => {

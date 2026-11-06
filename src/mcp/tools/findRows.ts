@@ -76,8 +76,17 @@ function plainNumber(text: string): number | undefined {
   return /^-?\d+(\.\d+)?$/.test(text) ? Number(text) : undefined
 }
 
+// The API returns dates with a time, such as 2026-08-05T00:00:00+02:00. Against a
+// plain date only the day counts: as text, the cell is never equal to 2026-08-05
+// and is greater than it, as in SQL it is not.
+function dayOfCell(cell: unknown, value: unknown): unknown {
+  const isDay = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+  return isDay && typeof cell === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(cell) ? cell.slice(0, 10) : cell
+}
+
 /** Is the cell equal to a filter value, which may be of another type? */
-function matchesValue(cell: unknown, value: unknown): boolean {
+function matchesValue(rawCell: unknown, value: unknown): boolean {
+  const cell = dayOfCell(rawCell, value)
   if (cell === value) return true
   if (typeof cell === 'number' && typeof value === 'string') return plainNumber(value) === cell
   if (typeof cell === 'string' && typeof value === 'number') return cell === String(value)
@@ -90,7 +99,8 @@ function matchesValue(cell: unknown, value: unknown): boolean {
  * would be greater than "10". NaN fails every comparison, so what can't be read as
  * a number matches nothing, and neither does an empty cell, as in SQL.
  */
-function compareToValue(cell: unknown, value: unknown): number {
+function compareToValue(rawCell: unknown, value: unknown): number {
+  const cell = dayOfCell(rawCell, value)
   if (cell === undefined || cell === null || cell === '' || value === undefined || value === null) return NaN
   if (typeof cell === 'number' && typeof value === 'string') return cell - (plainNumber(value) ?? NaN)
   if (typeof cell === 'string' && typeof value === 'number') return (plainNumber(cell) ?? NaN) - value
@@ -332,6 +342,32 @@ function resolveColumns(metadata: any, table: string, fields: string[], rows: Se
   return names
 }
 
+const DATE_COLUMN_TYPES = new Set(['date', 'ctime', 'mtime'])
+const FOREIGN_DATE = /^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b/
+
+/**
+ * Dates compare as text, which only works in SeaTable's format: "2026-07-13" is
+ * greater than "01.08.2026". Which date "01.02.2026" means depends on the locale,
+ * so this is reported instead of converted.
+ */
+function checkDateValues(where: any, metadata: any, table: string): void {
+  if (where === undefined || where === null) return
+  if (where.and || where.or) return (where.and ?? where.or).forEach((w: any) => checkDateValues(w, metadata, table))
+  if (where.not) return checkDateValues(where.not, metadata, table)
+
+  const arg: any = Object.values(where)[0]
+  const columns: Array<{ name: string; type?: string }> = metadata?.tables?.find((t: any) => t.name === table)?.columns ?? []
+  const type = columns.find((c) => c.name === arg.field)?.type
+  const isDate = (type !== undefined && DATE_COLUMN_TYPES.has(type)) || arg.field === '_ctime' || arg.field === '_mtime'
+  if (!isDate) return
+
+  const values: unknown[] = arg.values ?? [arg.value]
+  const foreign = values.find((v) => typeof v === 'string' && FOREIGN_DATE.test(v))
+  if (foreign !== undefined) {
+    throw makeError('ERR_VALIDATION', `Column "${arg.field}" holds dates: use the format YYYY-MM-DD instead of "${foreign}"`)
+  }
+}
+
 // Reads a filter in the forms models send, as long as the meaning is clear:
 // 1) a JSON string -> the object it contains
 // 2) { column, op, value } or { field, operator, value }, also without op
@@ -396,8 +432,10 @@ export const registerFindRows: ToolRegistrar = (server, { client, getInputSchema
       }
 
       const fields = [...fieldsOf(normalizedWhere), ...(parsed.order_by ? [parsed.order_by] : [])]
-      const corrected = fields.length > 0 ? resolveColumns(await client.getMetadata(), parsed.table, fields, all) : new Map<string, string>()
+      const metadata = fields.length > 0 ? await client.getMetadata() : undefined
+      const corrected = resolveColumns(metadata, parsed.table, fields, all)
       renameFields(normalizedWhere, corrected)
+      checkDateValues(normalizedWhere, metadata, parsed.table)
       const orderBy = parsed.order_by && (corrected.get(parsed.order_by) ?? parsed.order_by)
       const notice = corrected.size > 0
         ? [...corrected].map(([from, to]) => `Read column "${from}" as "${to}".`).join(' ')
