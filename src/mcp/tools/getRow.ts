@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { ToolRegistrar } from './types.js'
+import { ROW_ID_NOTE } from './utils.js'
 
 const InputSchema = z.object({
     table: z.string().describe('Target table name'),
@@ -12,7 +13,7 @@ export const registerGetRow: ToolRegistrar = (server, { client, getInputSchema }
         'get_row',
         {
             title: 'Get Row',
-            description: 'Get a row by ID from a table',
+            description: `Get a row by its ID. ${ROW_ID_NOTE}`,
             inputSchema: getInputSchema(InputSchema),
             annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         },

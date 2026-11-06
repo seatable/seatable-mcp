@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { mapMetadataToGeneric } from '../../schema/map.js'
 import { validateRowsAgainstSchema } from '../../schema/validate.js'
 import { ToolRegistrar } from './types.js'
+import { ROW_ID_NOTE } from './utils.js'
 
 const UpdateItem = z.object({
     row_id: z.string().describe('Row ID (_id field) to update'),
@@ -19,7 +20,7 @@ export const registerUpdateRows: ToolRegistrar = (server, { client, getInputSche
         'update_rows',
         {
             title: 'Update Rows',
-            description: 'Batch update rows. Rejects unknown columns. Link and file/image columns cannot be modified here — use link_rows/unlink_rows and upload_file instead.',
+            description: `Batch update rows. Rejects unknown columns. Link and file/image columns cannot be modified here — use link_rows/unlink_rows and upload_file instead. ${ROW_ID_NOTE}`,
             inputSchema: getInputSchema(InputSchema),
             annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
         },

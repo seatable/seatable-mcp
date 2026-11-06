@@ -26,7 +26,7 @@ export interface ClientLike {
     updateRow(table: string, rowId: string, row: Record<string, unknown>): Promise<any>
     updateRows(table: string, updates: Array<{ row_id: string; row: Record<string, unknown> }>): Promise<{ success: boolean }>
     deleteRow(table: string, rowId: string): Promise<{ success: boolean }>
-    deleteRows(table: string, rowIds: string[]): Promise<{ success: boolean }>
+    deleteRows(table: string, rowIds: string[]): Promise<{ success?: boolean; deleted_rows?: number }>
     searchRows(table: string, query: Record<string, unknown>): Promise<{ rows: any[]; page?: number; page_size?: number; total?: number; has_more?: boolean }>
 
     // SQL

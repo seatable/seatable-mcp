@@ -251,7 +251,7 @@ export class SeaTableClient {
         })
     }
 
-    async deleteRows(table: string, rowIds: string[]): Promise<{ success: boolean }> {
+    async deleteRows(table: string, rowIds: string[]): Promise<{ success?: boolean; deleted_rows?: number }> {
         return this.request('deleteRows', async (http) => {
             const res = await http.delete('/rows/', {
                 data: { table_name: table, row_ids: rowIds },
