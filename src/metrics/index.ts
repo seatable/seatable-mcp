@@ -42,6 +42,12 @@ export const rateLimitExceededTotal = new Counter({
     registers: [register],
 })
 
+export const sessionsEvictedTotal = new Counter({
+    name: 'mcp_sessions_evicted_total',
+    help: 'Idle sessions closed to make room for a new one of the same token at the connection limit',
+    registers: [register],
+})
+
 export const authValidationsTotal = new Counter({
     name: 'mcp_auth_validations_total',
     help: 'Total number of auth token validations',

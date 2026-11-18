@@ -1,6 +1,6 @@
 import type { AddressInfo } from 'node:net'
 
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../src/metrics/metricsServer', () => ({
     startMetricsServer: vi.fn().mockResolvedValue(undefined),
@@ -32,9 +32,9 @@ import { startHttpServer } from '../src/http/httpServer'
 /**
  * The production incident these tests encode: a client opened 14 sessions in 51
  * seconds, made one tool call, and then met "Connection limit exceeded" for
- * every further attempt. Two separate defects fed it — slots that a failed
- * initialize never gave back, and slots that a successful-but-unused session
- * held for the full 10-minute idle timeout.
+ * every further attempt. One defect fed it: slots that a failed initialize
+ * never gave back. Sessions that are idle but alive are handled by eviction,
+ * see tests/sessionEviction.spec.ts.
  */
 
 const JSON_HEADERS = {
@@ -121,14 +121,7 @@ describe('Connection slot accounting', () => {
             ids.push(res.headers.get('mcp-session-id')!)
         }
 
-        // Pool is full.
-        const blocked = await fetch(`${baseUrl}/mcp`, {
-            method: 'POST',
-            headers: { ...JSON_HEADERS, authorization: `Bearer ${token}`, 'x-forwarded-for': ip },
-            body: INIT_BODY,
-        })
-        expect(blocked.status).toBe(429)
-
+        // Pool is full; DELETE frees a slot, so the next session needs no eviction.
         await fetch(`${baseUrl}/mcp`, {
             method: 'DELETE',
             headers: { 'mcp-session-id': ids[0], authorization: `Bearer ${token}`, 'x-forwarded-for': ip },
@@ -140,6 +133,8 @@ describe('Connection slot accounting', () => {
             body: INIT_BODY,
         })
         expect(allowed.status).toBe(200)
+        expect(find('Session evicted')).toHaveLength(0)
+        ids.push(allowed.headers.get('mcp-session-id')!)
 
         for (const id of ids.slice(1)) {
             await fetch(`${baseUrl}/mcp`, {
@@ -147,115 +142,6 @@ describe('Connection slot accounting', () => {
                 headers: { 'mcp-session-id': id, authorization: `Bearer ${token}`, 'x-forwarded-for': ip },
             })
         }
-    })
-
-    /**
-     * "Connection limit exceeded" used to log only an IP — and behind a proxy
-     * that IP is the same for everyone, so the line could not answer "whose
-     * pool is full?" or "how full?".
-     */
-    it('logs which pool is exhausted and how full it is', async () => {
-        const token = 'slot-token-3'
-        const ip = '198.51.100.3'
-        const ids: string[] = []
-
-        for (let i = 0; i < 20; i++) {
-            const res = await fetch(`${baseUrl}/mcp`, {
-                method: 'POST',
-                headers: { ...JSON_HEADERS, authorization: `Bearer ${token}`, 'x-forwarded-for': ip },
-                body: INIT_BODY,
-            })
-            ids.push(res.headers.get('mcp-session-id')!)
-        }
-
-        await fetch(`${baseUrl}/mcp`, {
-            method: 'POST',
-            headers: { ...JSON_HEADERS, authorization: `Bearer ${token}`, 'x-forwarded-for': ip },
-            body: INIT_BODY,
-        })
-
-        const denied = find('Connection limit exceeded')
-        expect(denied.length).toBeGreaterThan(0)
-        const fields = denied[denied.length - 1].fields
-        expect(fields).toHaveProperty('token')
-        expect(String(fields.token)).not.toContain(token)
-        expect(fields).toHaveProperty('active', 20)
-        expect(fields).toHaveProperty('limit', 20)
-
-        for (const id of ids) {
-            await fetch(`${baseUrl}/mcp`, {
-                method: 'DELETE',
-                headers: { 'mcp-session-id': id, authorization: `Bearer ${token}`, 'x-forwarded-for': ip },
-            })
-        }
-    })
-})
-
-/**
- * A session that initializes and is then abandoned is the common client bug.
- * It should not hold a slot for the full idle timeout that working sessions get.
- */
-describe('Unused session timeout', () => {
-    let server: ReturnType<typeof import('node:http').createServer>
-    let baseUrl: string
-
-    beforeEach(async () => {
-        process.env.SEATABLE_SERVER_URL = 'http://localhost'
-        process.env.SEATABLE_API_TOKEN = 'test-token'
-        process.env.SEATABLE_MOCK = 'true'
-        delete process.env.SEATABLE_MODE
-
-        server = await startHttpServer({
-            port: 0,
-            sessionIdleTimeoutMs: 60_000,
-            unusedSessionTimeoutMs: 150,
-            sessionCheckIntervalMs: 50,
-        })
-        baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
-    })
-
-    afterEach(async () => {
-        if (server) await new Promise<void>((resolve) => server.close(() => resolve()))
-    })
-
-    async function init(): Promise<string> {
-        const res = await fetch(`${baseUrl}/mcp`, { method: 'POST', headers: JSON_HEADERS, body: INIT_BODY })
-        expect(res.status).toBe(200)
-        return res.headers.get('mcp-session-id')!
-    }
-
-    it('reclaims a session that never made a call', async () => {
-        const sessionId = await init()
-
-        await new Promise((r) => setTimeout(r, 300))
-
-        const res = await fetch(`${baseUrl}/mcp`, {
-            method: 'POST',
-            headers: { ...JSON_HEADERS, 'mcp-session-id': sessionId },
-            body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }),
-        })
-        expect(res.status).toBe(404)
-    })
-
-    it('keeps a session that has done real work on the full idle timeout', async () => {
-        const sessionId = await init()
-
-        const worked = await fetch(`${baseUrl}/mcp`, {
-            method: 'POST',
-            headers: { ...JSON_HEADERS, 'mcp-session-id': sessionId },
-            body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} }),
-        })
-        expect(worked.status).toBe(200)
-
-        // Well past the unused timeout, far short of the idle timeout.
-        await new Promise((r) => setTimeout(r, 300))
-
-        const res = await fetch(`${baseUrl}/mcp`, {
-            method: 'POST',
-            headers: { ...JSON_HEADERS, 'mcp-session-id': sessionId },
-            body: JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/list', params: {} }),
-        })
-        expect(res.status).toBe(200)
     })
 })
 

@@ -12,6 +12,7 @@ import { z } from 'zod'
 
 import { getEnv, parseBases, VERSION } from '../config/env.js'
 import type { CodedError } from '../errors.js'
+import { sessionFingerprint } from '../fingerprint.js'
 import { logger } from '../logger.js'
 import { toolCallsByToolTotal, toolCallsTotal, toolDurationSeconds } from '../metrics/index.js'
 import { createClientFromEnv, createClientFromToken,SeaTableClient } from '../seatable/client.js'
@@ -258,7 +259,7 @@ export class SeaTableMCPServer {
         // Common log context
         const logCtx = {
             requestId,
-            ...(this.sessionId && { sessionId: this.sessionId }),
+            ...(this.sessionId && { session: sessionFingerprint(this.sessionId) }),
             tool: toolName,
         }
 

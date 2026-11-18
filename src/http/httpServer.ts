@@ -6,9 +6,10 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { MCP_RESOURCE_PATH, OAuthProvider, PROTECTED_RESOURCE_PATH } from '../auth/oauthProvider.js'
 import { TokenValidator } from '../auth/tokenValidator.js'
 import { getEnv, type ServerMode, VERSION } from '../config/env.js'
+import { sessionFingerprint, tokenFingerprint } from '../fingerprint.js'
 import { logger } from '../logger.js'
 import { buildServer, getStaticToolDefinitions } from '../mcp/server.js'
-import { activeConnections, activeSessions, httpRequestsTotal } from '../metrics/index.js'
+import { activeConnections, activeSessions, httpRequestsTotal, rateLimitExceededTotal, sessionsEvictedTotal } from '../metrics/index.js'
 import { startMetricsServer } from '../metrics/metricsServer.js'
 import { RateLimitManager } from '../ratelimit/index.js'
 
@@ -17,12 +18,6 @@ export interface StartHttpServerOptions {
     port?: number
     /** Session idle timeout in ms (default: 10 minutes) */
     sessionIdleTimeoutMs?: number
-    /**
-     * Idle timeout for a session that initialized but never made a call
-     * (default: 30 seconds). These are the sessions a reconnect-happy client
-     * leaves behind, and each one holds a connection slot while it lives.
-     */
-    unusedSessionTimeoutMs?: number
     /** Interval for checking idle sessions in ms (default: 60 seconds) */
     sessionCheckIntervalMs?: number
 }
@@ -32,24 +27,14 @@ type ActiveSession = {
     apiToken?: string
     /** Digest of the SeaTable API token that created this session; every later request must resolve to the same one. */
     apiTokenDigest?: Buffer
-    /** False until the client makes its first call. Sessions that never do are reclaimed far sooner. */
-    used: boolean
+    /** POSTs on this session still being worked on. A session with one is never evicted. */
+    inFlight: number
     lastActivity: number
     close: () => Promise<void>
 }
 
 function digest(value: string): Buffer {
     return createHash('sha256').update(value).digest()
-}
-
-/** Session IDs are credentials-adjacent routing values — log a fingerprint, never the value. */
-function sessionFingerprint(sessionId: string): string {
-    return createHash('sha256').update(sessionId).digest('hex').slice(0, 12)
-}
-
-/** Same rule for API tokens: enough to correlate one tenant's lines, never the credential. */
-function tokenFingerprint(apiToken: string): string {
-    return createHash('sha256').update(apiToken).digest('hex').slice(0, 12)
 }
 
 const MAX_BODY_SIZE = 10 * 1024 * 1024 // 10 MB
@@ -167,6 +152,45 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
         res.writeHead(401, headers).end(message)
     }
 
+    /** Sessions of this token that are in the middle of a request. */
+    function busySessions(apiToken: string): number {
+        let busy = 0
+        for (const session of sessions.values()) {
+            if (session.apiToken === apiToken && session.inFlight > 0) busy++
+        }
+        return busy
+    }
+
+    /**
+     * Close the session of this token that has been idle longest and has no
+     * request in flight. Never touches another token's sessions. A client that
+     * comes back to it gets 404, on which the MCP spec requires it to initialize
+     * a new session.
+     */
+    async function evictIdlestSession(apiToken: string): Promise<boolean> {
+        let victimId: string | undefined
+        let victim: ActiveSession | undefined
+        for (const [id, session] of sessions.entries()) {
+            if (session.apiToken !== apiToken || session.inFlight > 0) continue
+            if (!victim || session.lastActivity < victim.lastActivity) {
+                victimId = id
+                victim = session
+            }
+        }
+        if (!victim || !victimId) return false
+        logger.info(
+            {
+                session: sessionFingerprint(victimId),
+                token: tokenFingerprint(apiToken),
+                idleMs: Date.now() - victim.lastActivity,
+            },
+            'Session evicted'
+        )
+        sessionsEvictedTotal.inc()
+        await victim.close()
+        return true
+    }
+
     const trustProxy = env.TRUST_PROXY ?? true
 
     /**
@@ -201,6 +225,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
         for (const result of checks) {
             if (!result.allowed) {
                 logger.warn({ ip, endpoint: req.url }, 'OAuth rate limit exceeded')
+                rateLimitExceededTotal.inc({ type: 'oauth' })
                 res.writeHead(429, {
                     'content-type': 'text/plain',
                     'retry-after': String(Math.max(1, Math.ceil(result.retryAfterMs / 1000))),
@@ -243,6 +268,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
                 const preAuthResult = rateLimiter.preAuth.check(getClientIp(req))
                 if (!preAuthResult.allowed) {
                     logger.warn({ ip: getClientIp(req) }, 'Pre-auth rate limit exceeded')
+                    rateLimitExceededTotal.inc({ type: 'pre_auth' })
                     const retryAfter = Math.ceil(preAuthResult.retryAfterMs / 1000)
                     res.writeHead(429, {
                         'content-type': 'text/plain',
@@ -272,40 +298,56 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
             // Before the slot is taken, so that a body that doesn't parse can't hold one.
             const body = await parseJsonBody(req)
 
-            // Connection limit (managed mode)
+            /*
+             * Connection limit (managed mode). The pool caps how many sessions of
+             * one token may work at the same time, not how many it has walked
+             * away from: ChatGPT opens a session per tool call and never closes
+             * one. When the pool is full, the session of this token that has been
+             * idle longest makes room. Only when every one of them is in the
+             * middle of a request is the client turned away.
+             */
             if (rateLimiter && apiToken) {
                 if (!rateLimiter.connections.acquire(apiToken)) {
-                    logger.warn(
-                        {
-                            ip: getClientIp(req),
-                            token: tokenFingerprint(apiToken),
-                            active: rateLimiter.connections.active(apiToken),
-                            limit: rateLimiter.connections.maxConnections,
-                        },
-                        'Connection limit exceeded'
-                    )
-                    res.writeHead(429, { 'content-type': 'text/plain' }).end('Too many concurrent connections')
-                    return
+                    const evicted = await evictIdlestSession(apiToken)
+                    if (!evicted || !rateLimiter.connections.acquire(apiToken)) {
+                        logger.warn(
+                            {
+                                ip: getClientIp(req),
+                                token: tokenFingerprint(apiToken),
+                                active: rateLimiter.connections.active(apiToken),
+                                busy: busySessions(apiToken),
+                                limit: rateLimiter.connections.maxConnections,
+                            },
+                            'Connection limit exceeded'
+                        )
+                        rateLimitExceededTotal.inc({ type: 'connections' })
+                        res.writeHead(429, { 'content-type': 'text/plain' }).end('Too many concurrent connections')
+                        return
+                    }
                 }
                 activeConnections.inc()
             }
 
             const mcpServer = buildServer(apiToken ? { apiToken } : undefined)
-            let sessionEstablished = false
+            let established: ActiveSession | undefined
             const transport = new StreamableHTTPServerTransport({
                 sessionIdGenerator: () => randomUUID(),
                 onsessioninitialized: (id) => {
-                    sessionEstablished = true
                     mcpServer.setSessionId(id)
-                    logger.info({ session: sessionFingerprint(id) }, 'Session initialized')
-                    sessions.set(id, {
+                    logger.info(
+                        { session: sessionFingerprint(id), ...(apiToken && { token: tokenFingerprint(apiToken) }) },
+                        'Session initialized'
+                    )
+                    established = {
                         transport,
                         apiToken,
                         apiTokenDigest: apiToken ? digest(apiToken) : undefined,
-                        used: false,
+                        // The initialize request itself is still being answered.
+                        inFlight: 1,
                         lastActivity: Date.now(),
                         close: cleanup,
-                    })
+                    }
+                    sessions.set(id, established)
                     activeSessions.inc()
                 },
             })
@@ -314,7 +356,7 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
             const cleanup = async () => {
                 if (cleaned) return
                 cleaned = true
-                if (sessionEstablished) activeSessions.dec()
+                if (established) activeSessions.dec()
                 if (apiToken && rateLimiter) {
                     rateLimiter.connections.release(apiToken)
                     activeConnections.dec()
@@ -346,7 +388,15 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
              * above was held until the process restarted.
              */
             res.on('close', () => {
-                if (!sessionEstablished) void cleanup()
+                if (established) {
+                    established.inFlight--
+                    return
+                }
+                logger.info(
+                    { ip: getClientIp(req), status: res.statusCode, ...(apiToken && { token: tokenFingerprint(apiToken) }) },
+                    'Initialize request ended without a session'
+                )
+                void cleanup()
             })
 
             await mcpServer.connect(transport)
@@ -394,6 +444,19 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
                 }
             }
 
+            session.lastActivity = Date.now()
+
+            // A POST is work in progress from the moment its body starts arriving
+            // until the response is done. A GET stream is not: ChatGPT opens one
+            // and drops it at once, other clients hold one for the whole session.
+            if (req.method === 'POST') {
+                session.inFlight++
+                res.on('close', () => {
+                    session.inFlight--
+                    session.lastActivity = Date.now()
+                })
+            }
+
             const body = req.method === 'POST' ? await parseJsonBody(req) : undefined
 
             // The session can end while a large body is on its way.
@@ -402,8 +465,6 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
                 return
             }
 
-            session.used = true
-            session.lastActivity = Date.now()
             await session.transport.handleRequest(req, res, body)
             return
         }
@@ -544,19 +605,15 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
 
     logger.info({ host, port, endpoint: '/mcp' }, 'Streamable HTTP server listening')
 
-    // Idle session cleanup
+    // Idle session cleanup. Sessions that crowd the connection pool sooner than
+    // this are evicted on demand, see evictIdlestSession().
     const sessionIdleTimeoutMs = options.sessionIdleTimeoutMs ?? 10 * 60 * 1000
     const sessionCheckIntervalMs = options.sessionCheckIntervalMs ?? 60 * 1000
-    // A session that never made a call gets a much shorter leash than one doing
-    // real work — it is holding a connection slot for nothing. Never longer
-    // than the ordinary idle timeout, whatever the caller passes.
-    const unusedSessionTimeoutMs = Math.min(options.unusedSessionTimeoutMs ?? 30 * 1000, sessionIdleTimeoutMs)
     const idleCheckInterval = setInterval(() => {
         const now = Date.now()
         for (const [sessionId, session] of sessions.entries()) {
-            const timeout = session.used ? sessionIdleTimeoutMs : unusedSessionTimeoutMs
-            if (now - session.lastActivity > timeout) {
-                logger.info({ session: sessionFingerprint(sessionId), used: session.used }, 'Closing idle session')
+            if (session.inFlight === 0 && now - session.lastActivity > sessionIdleTimeoutMs) {
+                logger.info({ session: sessionFingerprint(sessionId) }, 'Closing idle session')
                 void session.close()
             }
         }

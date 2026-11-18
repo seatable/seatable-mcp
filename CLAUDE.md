@@ -52,10 +52,14 @@ Copy `.env.example` to `.env` for local development.
 
 ### Connection slots and session lifetime
 
-The concurrent-connection limit (20, per API token, `src/ratelimit/index.ts`) is acquired on session creation and released on `DELETE`, transport close, or by the idle sweeper. Two rules keep the pool from silting up, both covered by `tests/connectionSlots.spec.ts`:
+The connection limit (20, per API token, `src/ratelimit/index.ts`) is acquired on session creation and released on `DELETE`, transport close, eviction, or by the idle sweeper (10 minutes). It caps how many sessions of one token may **work** at once, not how many it has abandoned:
 
-- An initialize request that never produces a session (malformed body, aborted client) releases its slot from `res.on('close')`. Without that the slot is unreachable — the transport never opened, so `onclose` never fires, and the sweeper never sees a session that was never registered.
-- A session that initialized but never made a call is reclaimed after **30 s** (`unusedSessionTimeoutMs`) instead of the ordinary 10-minute idle timeout. Reconnect-happy clients leave these behind by the dozen; each one holds a slot.
+- When the pool is full, `evictIdlestSession()` closes the session of the **same token** that has been idle longest and has no POST in flight (`inFlight`). Only if all 20 are mid-request does the client get `429`. A client returning to an evicted session gets `404` and must re-initialize (MCP spec). A GET stream does not count as in flight. Coverage: `tests/sessionEviction.spec.ts`, which replays the 15 November 2026 incident.
+- An initialize request that never produces a session (malformed body, aborted client) releases its slot from `res.on('close')`. Without that the slot is unreachable — the transport never opened, so `onclose` never fires, and nothing can evict a session that was never registered. Coverage: `tests/connectionSlots.spec.ts`.
+
+ChatGPT opens a new session for every tool call (initialize, `notifications/initialized`, a GET it aborts after a millisecond, one `tools/call`) and never sends `DELETE`. Twice the response was to treat the symptom: raising the limit from 5 to 20, then a 30-second timeout for "unused" sessions, which never fired because the `initialized` notification and the GET already counted as use. Do not raise the limit or add per-client timeouts again; eviction is what makes the pool independent of how many sessions a client leaves behind.
+
+`Session initialized`, `Session evicted` and every 429 that knows its token log the token fingerprint, so a burst can be attributed to a tenant. All 429s are counted in `mcp_rate_limit_exceeded_total{type}`, evictions in `mcp_sessions_evicted_total`.
 
 Client IP for rate limiting comes from the **rightmost** `X-Forwarded-For` entry — the hop our own proxy appended. The leftmost entry is client-supplied and would let a caller pick its own rate-limit bucket. `docker-compose.yml` additionally has Caddy overwrite the header rather than append to it.
 

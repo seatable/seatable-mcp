@@ -1,3 +1,4 @@
+import { tokenFingerprint } from '../fingerprint.js'
 import { logger } from '../logger.js'
 import { rateLimitExceededTotal } from '../metrics/index.js'
 import { ConnectionCounter } from './connectionCounter.js'
@@ -64,7 +65,7 @@ export class RateLimitManager {
         if (opts.token) {
             const tokenResult = this.perToken.check(opts.token)
             if (!tokenResult.allowed) {
-                logger.warn({ type: 'per_token', ip: opts.ip }, 'Rate limit exceeded')
+                logger.warn({ type: 'per_token', ip: opts.ip, token: tokenFingerprint(opts.token) }, 'Rate limit exceeded')
                 rateLimitExceededTotal.inc({ type: 'per_token' })
                 return { allowed: false, retryAfterMs: tokenResult.retryAfterMs, reason: 'Token rate limit exceeded' }
             }
