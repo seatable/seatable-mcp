@@ -137,7 +137,7 @@ Done by someone in the workspace with developer mode access and *Tunnels Read + 
 
 ## Open points
 
-- Not yet verified end to end: whether `tunnel-client` passes the `mcp-session-id` header through correctly. The server is stateful and reclaims unused sessions after 30 seconds; problems would show up in the `seatable-mcp` logs on the first connection.
+- Not yet verified end to end: whether `tunnel-client` passes the `mcp-session-id` header through correctly. The server is stateful; idle sessions are closed after 10 minutes or earlier when a token's 20 slots are full; problems would show up in the `seatable-mcp` logs on the first connection.
 - The `tunnel-client` image's entrypoint (`tunnel-client run`) and environment variable names are taken from OpenAI's repository and documentation, not from a running deployment.
 
 Update this file once a deployment has confirmed or corrected these points.

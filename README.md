@@ -217,7 +217,7 @@ The security characteristics differ significantly between transport modes:
 | **Network exposure** | None (local process) | TCP port, **no auth** | TCP port, Bearer auth |
 | **Authentication** | Not needed (local) | None | Bearer token or OAuth 2.0, validated against SeaTable |
 | **Rate limiting** | None | None | Per-token, per-IP, global |
-| **Connection limits** | N/A | None | 20 concurrent sessions per token |
+| **Connection limits** | N/A | None | 20 sessions per token; the longest-idle one makes room |
 | **Data scope** | All configured bases | All configured bases | One base per client token |
 
 > **⚠️ Warning:** Selfhosted HTTP mode (`--sse` / `--http`) has **no authentication**. Anyone who can reach the port gets full access to all configured bases, including write and delete operations. Only run it in trusted networks (localhost, Docker-internal) or behind a reverse proxy that handles authentication. For untrusted networks, use **managed mode** instead.
@@ -226,7 +226,7 @@ The security characteristics differ significantly between transport modes:
 
 SeaTable's own API gateway enforces rate limits **per base** (default: 500 requests/minute per `base_uuid`) and **per organization** (monthly quota). These limits apply regardless of whether requests come from the MCP server, the web UI, or direct API calls. The MCP server does not duplicate these limits — instead, it retries automatically with exponential backoff when SeaTable returns `429 Too Many Requests`.
 
-In **managed mode**, the MCP server adds its own rate limits to protect the server process itself (not the SeaTable backend): 60 req/min per token, 120/min per IP, 30/min for new session creation, and 20 concurrent connections per token.
+In **managed mode**, the MCP server adds its own rate limits to protect the server process itself (not the SeaTable backend): 60 req/min per token, 120/min per IP, 30/min for new session creation, and 20 sessions per token. When a token's 20 sessions are all taken, the one idle longest is closed to make room (a client returning to it gets `404` and initializes again, as the MCP spec requires); only if all 20 are in the middle of a request is the new one rejected with `429`. ChatGPT opens a new session for every tool call and never closes one, so it relies on this.
 
 ### Input Validation
 
@@ -279,7 +279,8 @@ Available metrics:
 | `mcp_tool_calls_by_tool_total{tool}` | Counter | Total calls per tool (regardless of outcome) |
 | `mcp_tool_duration_seconds{tool}` | Histogram | Tool execution time |
 | `mcp_http_requests_total{method, status}` | Counter | HTTP requests by method and status code |
-| `mcp_rate_limit_exceeded_total{type}` | Counter | Rate limit rejections (global/per_ip/per_token) |
+| `mcp_rate_limit_exceeded_total{type}` | Counter | Rate limit rejections (`global`, `per_ip`, `per_token`, `pre_auth`, `oauth`, `connections`) |
+| `mcp_sessions_evicted_total` | Counter | Idle sessions closed to make room for a new session of the same token |
 | `mcp_auth_validations_total{result}` | Counter | Auth validations (success/failure/cache_hit) |
 | `mcp_sql_failures_total{tool, reason}` | Counter | Failed `query_sql`/`execute_sql` calls (e.g. `subquery`, `join`, `wrong_statement_update`, `unknown_name`, `invalid_value`, `seatable_error`) |
 | `mcp_active_sessions` | Gauge | Currently active HTTP sessions |
