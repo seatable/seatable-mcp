@@ -68,4 +68,31 @@ describe('TokenCipher', () => {
         expect(cipher.open('access', '')).toBeUndefined()
         expect(cipher.open('access', 'stmcp1.AAAA')).toBeUndefined()
     })
+
+    describe('inspect() names the reason for a rejection', () => {
+        const cipher = new TokenCipher(SECRET)
+
+        it('missing', () => {
+            expect(cipher.inspect('client', '')).toEqual({ reason: 'missing' })
+        })
+
+        it('foreign: not our envelope, or another kind of ours', () => {
+            expect(cipher.inspect('client', 'some-other-servers-client-id')).toEqual({ reason: 'foreign' })
+            expect(cipher.inspect('client', cipher.seal('access', {}, 60_000))).toEqual({ reason: 'foreign' })
+        })
+
+        it('invalid: sealed under another secret', () => {
+            const other = new TokenCipher('a-different-secret-that-is-also-long-enough')
+            expect(cipher.inspect('client', other.seal('client', {}, 60_000))).toEqual({ reason: 'invalid' })
+        })
+
+        it('expired', () => {
+            expect(cipher.inspect('client', cipher.seal('client', {}, -1))).toEqual({ reason: 'expired' })
+        })
+
+        it('returns the payload of a valid value, like open()', () => {
+            const result = cipher.inspect('client', cipher.seal('client', { n: 'x' }, 60_000))
+            expect('payload' in result && result.payload.n).toBe('x')
+        })
+    })
 })

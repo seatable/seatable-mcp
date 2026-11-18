@@ -12,6 +12,7 @@ vi.mock('../src/logger', () => {
 })
 
 import { OAuthProvider } from '../src/auth/oauthProvider.js'
+import { TokenCipher } from '../src/auth/tokenCipher.js'
 
 /**
  * After the external report, the forensic questions could not be answered from
@@ -279,5 +280,45 @@ describe('no rejection path is silent', () => {
         expect(rejected).toHaveLength(1)
         expect(rejected[0].fields.callback).toBe('https://attacker.example/cb')
         expect(rejected[0].fields.ip).toBe('198.51.100.66')
+    })
+})
+
+describe('a stale client registration is attributable', () => {
+    /*
+     * Production showed bursts of "unknown or expired client registration",
+     * three every few seconds, with no field at all: neither who sent them nor
+     * whether the registration had expired or was sealed under another secret.
+     */
+    async function authorizeWith(clientId: string) {
+        await fetch(base(
+            `/authorize?response_type=code&client_id=${encodeURIComponent(clientId)}`
+            + `&redirect_uri=${encodeURIComponent(CB)}&code_challenge=${CHALLENGE}&code_challenge_method=S256`,
+        ), { headers: { 'x-forwarded-for': '198.51.100.42' } })
+        return find('unknown or expired client registration')
+    }
+
+    it('records reason, IP, callback and a fingerprint of the client_id', async () => {
+        const stale = new TokenCipher('the-secret-before-it-was-rotated-long-enough')
+            .seal('client', { n: 'Old Client', r: [CB] }, 60_000)
+        const rejected = await authorizeWith(stale)
+
+        expect(rejected).toHaveLength(1)
+        expect(rejected[0].fields).toMatchObject({ reason: 'invalid', ip: '198.51.100.42', callback: CB })
+        expect(rejected[0].fields.clientId).toMatch(/^[0-9a-f]{12}$/)
+        expect(JSON.stringify(rejected[0].fields)).not.toContain(stale)
+    })
+
+    it('tells an expired registration apart', async () => {
+        const expired = new TokenCipher(SECRET).seal('client', { n: 'Old Client', r: [CB] }, -1)
+        const [rejected] = await authorizeWith(expired)
+        expect(rejected.fields.reason).toBe('expired')
+    })
+
+    it('gives the same client_id the same fingerprint, so a burst groups', async () => {
+        const [a] = await authorizeWith('not-one-of-ours')
+        logCalls.length = 0
+        const [b] = await authorizeWith('not-one-of-ours')
+        expect(a.fields.reason).toBe('foreign')
+        expect(a.fields.clientId).toBe(b.fields.clientId)
     })
 })
