@@ -29,6 +29,8 @@ export interface SealedPayload {
     [key: string]: unknown
 }
 
+export type RejectReason = 'missing' | 'foreign' | 'invalid' | 'expired'
+
 export class TokenCipher {
     private readonly key: Buffer
 
@@ -51,12 +53,31 @@ export class TokenCipher {
 
     /** Returns the payload, or undefined if the value is forged, tampered with, of the wrong kind, or expired. */
     open<T extends Record<string, unknown> = Record<string, unknown>>(kind: TokenKind, value: string): (T & SealedPayload) | undefined {
-        const prefix = PREFIX[kind]
-        if (typeof value !== 'string' || !value.startsWith(prefix)) return undefined
+        const result = this.inspect<T>(kind, value)
+        return 'payload' in result ? result.payload : undefined
+    }
 
+    /**
+     * Like open(), but says why a value was rejected, for logs:
+     * - `missing`: empty.
+     * - `foreign`: not one of our envelopes of this kind — typically a value
+     *   issued by another server, or a different kind of ours.
+     * - `invalid`: our prefix, but it doesn't authenticate. Forged, truncated,
+     *   or sealed under a different SEATABLE_TOKEN_SECRET.
+     * - `expired`: genuine, but past its expiry.
+     */
+    inspect<T extends Record<string, unknown> = Record<string, unknown>>(
+        kind: TokenKind,
+        value: string
+    ): { payload: T & SealedPayload } | { reason: RejectReason } {
+        if (typeof value !== 'string' || value === '') return { reason: 'missing' }
+        const prefix = PREFIX[kind]
+        if (!value.startsWith(prefix)) return { reason: 'foreign' }
+
+        let payload: T & SealedPayload
         try {
             const raw = Buffer.from(value.slice(prefix.length), 'base64url')
-            if (raw.length <= NONCE_BYTES + TAG_BYTES) return undefined
+            if (raw.length <= NONCE_BYTES + TAG_BYTES) return { reason: 'invalid' }
 
             const nonce = raw.subarray(0, NONCE_BYTES)
             const ciphertext = raw.subarray(NONCE_BYTES, raw.length - TAG_BYTES)
@@ -66,13 +87,13 @@ export class TokenCipher {
             decipher.setAAD(Buffer.from(kind))
             decipher.setAuthTag(tag)
             const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf-8')
-
-            const payload = JSON.parse(plaintext) as T & SealedPayload
-            if (typeof payload.exp !== 'number' || Date.now() >= payload.exp) return undefined
-            return payload
+            payload = JSON.parse(plaintext) as T & SealedPayload
         } catch {
             // Any failure — bad base64, failed auth tag, malformed JSON — is a rejection.
-            return undefined
+            return { reason: 'invalid' }
         }
+        if (typeof payload.exp !== 'number') return { reason: 'invalid' }
+        if (Date.now() >= payload.exp) return { reason: 'expired' }
+        return { payload }
     }
 }

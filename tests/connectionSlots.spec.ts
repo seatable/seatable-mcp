@@ -6,7 +6,7 @@ vi.mock('../src/metrics/metricsServer', () => ({
     startMetricsServer: vi.fn().mockResolvedValue(undefined),
 }))
 
-const VALID_TOKENS = new Set(['slot-token-1', 'slot-token-2', 'slot-token-3', 'slot-token-4'])
+const VALID_TOKENS = new Set(['slot-token-1', 'slot-token-2', 'slot-token-3', 'slot-token-4', 'slot-token-log'])
 
 vi.mock('../src/auth/tokenValidator', () => ({
     TokenValidator: class {
@@ -104,6 +104,27 @@ describe('Connection slot accounting', () => {
         })
         expect(res.status).toBe(200)
         expect(res.headers.get('mcp-session-id')).toBeTruthy()
+    })
+
+    /**
+     * In production most sessions were preceded by one of these 400s, and the
+     * log said nothing about why. The method and the SDK's reason say whether a
+     * client is replaying a request without its session or speaking a protocol
+     * version we don't support.
+     */
+    it('logs the method and reason of a POST without session ID that is not initialize', async () => {
+        const res = await fetch(`${baseUrl}/mcp`, {
+            method: 'POST',
+            headers: { ...JSON_HEADERS, authorization: 'Bearer slot-token-log', 'x-forwarded-for': '198.51.100.9' },
+            body: JSON.stringify({ jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'list_tables', arguments: {} } }),
+        })
+        expect(res.status).toBe(400)
+        await res.text()
+        await vi.waitFor(() => expect(find('Initialize request ended without a session')).toHaveLength(1))
+
+        const [entry] = find('Initialize request ended without a session')
+        expect(entry.fields).toMatchObject({ status: 400, method: 'tools/call', reason: 'Bad Request: Server not initialized' })
+        expect(JSON.stringify(entry.fields)).not.toContain('list_tables')
     })
 
     it('releases the slot when a session is closed with DELETE', async () => {

@@ -70,6 +70,28 @@ async function parseJsonBody(req: IncomingMessage): Promise<unknown> {
 }
 
 /**
+ * The JSON-RPC method(s) of a request body, for logs. A POST without a session
+ * ID is treated as initialize; when it is something else the SDK answers 400,
+ * and the method says what the client was really trying to do. Method names are
+ * protocol vocabulary, never customer content, but they come from the caller,
+ * so anything that doesn't look like one is reduced to `invalid`.
+ */
+export function jsonRpcMethods(body: unknown): string {
+    const one = (message: unknown): string => {
+        if (typeof message !== 'object' || message === null) return 'invalid'
+        const method = (message as { method?: unknown }).method
+        if (method === undefined) return 'result' in message || 'error' in message ? 'response' : 'invalid'
+        return typeof method === 'string' && /^[A-Za-z0-9_./-]{1,64}$/.test(method) ? method : 'invalid'
+    }
+    if (Array.isArray(body)) {
+        const methods = body.slice(0, 5).map(one)
+        if (body.length > 5) methods.push('...')
+        return methods.join(',') || 'empty'
+    }
+    return body === undefined ? 'empty' : one(body)
+}
+
+/**
  * Hosts allowed as remote https callbacks in the OAuth flow. Unset means the
  * built-in list of hosted MCP clients; '*' disables curation (dangerous).
  */
@@ -380,6 +402,13 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
                 void cleanup()
             }
 
+            // Set before connect(): the SDK chains its own handler onto this one.
+            // It is the only place the reason for an SDK-generated 400 surfaces.
+            let transportError: string | undefined
+            transport.onerror = (error) => {
+                transportError ??= error.message.slice(0, 200)
+            }
+
             /*
              * An initialize request that never produces a session — a malformed
              * body the SDK rejects, a client that hangs up, a transport error —
@@ -393,7 +422,13 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
                     return
                 }
                 logger.info(
-                    { ip: getClientIp(req), status: res.statusCode, ...(apiToken && { token: tokenFingerprint(apiToken) }) },
+                    {
+                        ip: getClientIp(req),
+                        status: res.statusCode,
+                        method: jsonRpcMethods(body),
+                        ...(transportError && { reason: transportError }),
+                        ...(apiToken && { token: tokenFingerprint(apiToken) }),
+                    },
                     'Initialize request ended without a session'
                 )
                 void cleanup()
@@ -603,7 +638,13 @@ export async function startHttpServer(options: StartHttpServerOptions = {}) {
         server.listen(port, host)
     })
 
-    logger.info({ host, port, endpoint: '/mcp' }, 'Streamable HTTP server listening')
+    logger.info({
+        mode: env.SEATABLE_MOCK ? 'mock' : mode,
+        tools: getStaticToolDefinitions().length,
+        host,
+        port,
+        endpoint: '/mcp',
+    }, 'seatable-mcp started')
 
     // Idle session cleanup. Sessions that crowd the connection pool sooner than
     // this are evicted on demand, see evictIdlestSession().

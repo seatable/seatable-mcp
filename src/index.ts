@@ -76,6 +76,7 @@ async function main() {
     }
 
     await server.connect(transport)
+    logger.info({ transport: 'stdio', tools: server.getToolDefinitions().length }, 'seatable-mcp started')
 }
 
 // Exported CLI entry for bin launcher (used by npx)

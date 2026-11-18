@@ -98,7 +98,7 @@ The MCP server can be started and tested before the tunnel exists:
 
 ```bash
 docker compose up -d seatable-mcp
-docker compose logs seatable-mcp      # expect "Streamable HTTP server listening"
+docker compose logs seatable-mcp      # expect "seatable-mcp started"
 
 docker run --rm --network seatable-mcp_mcp-net curlimages/curl -s \
   -X POST http://seatable-mcp:3000/mcp \

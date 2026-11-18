@@ -385,10 +385,9 @@ export function buildServer(options?: BuildServerOptions) {
         mode = 'selfhosted'
     }
 
-    logger.info({
-        mode,
-        tools: server.getToolDefinitions().length,
-    }, 'seatable-mcp started')
+    // Called once per HTTP session, so this is not the startup line: that is
+    // logged once per process by main() (stdio) and startHttpServer().
+    logger.debug({ mode, tools: server.getToolDefinitions().length }, 'MCP server built')
 
     return server
 }

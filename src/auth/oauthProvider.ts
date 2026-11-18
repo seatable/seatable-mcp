@@ -383,12 +383,25 @@ export class OAuthProvider {
         const codeChallenge = pick('code_challenge')
         const codeChallengeMethod = pick('code_challenge_method')
 
-        const client = clientId ? this.cipher.open<ClientRegistration>('client', clientId) : undefined
-        if (!client) {
-            logger.warn('OAuth authorize rejected: unknown or expired client registration')
+        const opened = this.cipher.inspect<ClientRegistration>('client', clientId)
+        if (!('payload' in opened)) {
+            // A client that keeps presenting a stale client_id shows up as a burst
+            // of these. `clientId` (the same fingerprint as in the refresh log)
+            // groups the burst; `reason` says whether the registration expired,
+            // was sealed under another secret, or was never ours.
+            logger.warn(
+                {
+                    reason: opened.reason,
+                    ip: this.clientIp(req),
+                    ...(clientId && { clientId: fingerprint(clientId) }),
+                    ...(redirectUri && { callback: safeCallback(redirectUri) }),
+                },
+                'OAuth authorize rejected: unknown or expired client registration'
+            )
             this.authorizeError(res, 'Unknown client', 'This application is not registered with SeaTable MCP, or its registration has expired. Nothing has been sent to it.')
             return
         }
+        const client = opened.payload
 
         if (responseType !== 'code') {
             this.authorizeError(res, 'Unsupported request', 'Only the authorization code flow is supported.')
